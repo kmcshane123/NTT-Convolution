@@ -1,0 +1,338 @@
+#include <cstdint>
+#include <iostream>
+#include <vector>
+#include <algorithm>
+#include <array>
+#include <cassert>
+using namespace std;
+
+template <uint32_t mod>  // MOD INT STORED IN MONTGOMERY FORM
+class  Mint
+{
+  private:
+    using  i32 = int32_t;    using  i64 = int64_t;
+    using  u32 = uint32_t;   using  u64 = uint64_t;
+
+    static constexpr u32  get_r()  {
+        u32  ret = mod;
+        for( i32 i=0 ; i<4 ; ++i )  ret *= 2 - mod * ret;
+        return  ret;
+    }
+
+    static constexpr u32  reduce( const u64 &b )  {
+        return ( b + u64( u32( b ) * u32( -r ) ) * mod ) >> 32;
+    }
+
+    // CLASS MEMBER DATA
+    static constexpr u32  r  = get_r();
+    static constexpr u32  n2 = -u64( mod ) % mod;
+    u32                   a;
+
+    static_assert( r * mod == 1,    "invalid, r * mod != 1" );
+    static_assert( mod < (1 << 30), "invalid, mod >= 2 ^ 30" );
+    static_assert( (mod & 1) == 1,  "invalid, mod % 2 == 0" );
+
+  public:
+    constexpr Mint() : a( 0 ) {}
+    constexpr Mint( i64 b )
+        : a( reduce( u64( b % mod + mod ) * n2 ) ) {};
+
+    constexpr Mint &operator += ( const Mint &b )  {
+        if( i32( a += b.a - 2 * mod ) < 0 )   a += 2 * mod;
+        return  *this;
+    }
+    constexpr Mint &operator -= ( const Mint &b )  {
+        if( i32( a -= b.a ) < 0 )   a += 2 * mod;
+        return  *this;
+    }
+    constexpr Mint &operator *= ( const Mint &b )  {
+        a = reduce( u64( a ) * b.a );
+        return  *this;
+    }
+    constexpr Mint &operator /= ( const Mint &b )  {
+        *this *= b.inverse();
+        return  *this;
+    }
+
+    constexpr Mint operator  + (const Mint &b) const { return Mint(*this) += b; }
+    constexpr Mint operator  - (const Mint &b) const { return Mint(*this) -= b; }
+    constexpr Mint operator  * (const Mint &b) const { return Mint(*this) *= b; }
+    constexpr Mint operator  / (const Mint &b) const { return Mint(*this) /= b; }
+    constexpr Mint operator - () const {  return  Mint() - Mint(*this); }
+    Mint& operator         ++ ()  { return  *this += Mint( 1 ); }
+    Mint& operator         -- ()  { return  *this -= Mint( 1 ); }
+
+    constexpr Mint  pow( u64 n ) const  {
+        Mint  ret(  1 ), mul( *this );
+        while( n > 0 )  { if( n & 1 )  ret *= mul;   mul *= mul;  n >>= 1; }
+        return  ret;
+    }
+    constexpr Mint  inverse() const { return  pow( mod - 2 ); }
+    constexpr u32  get() const  {
+        u32  ret = reduce( a );
+        return  ret >= mod ? ret - mod : ret;
+    }
+    static constexpr u32  get_mod()  { return mod; }
+
+    constexpr bool operator == (const Mint &b) const {
+        return ( a >= mod ? a - mod : a ) == ( b.a >= mod ? b.a - mod : b.a );
+    }
+    constexpr bool operator != (const Mint &b) const  {
+        return ( a >= mod ? a - mod : a ) != ( b.a >= mod ? b.a - mod : b.a );
+    }
+
+    friend ostream &operator << ( ostream &os, const Mint &b )  {
+        return  os << b.get();
+    }
+    friend istream &operator >> ( istream &is, Mint &b )  {
+        int64_t  t;  is >> t;
+        b = Mint( t );
+        return  is;
+    }
+};
+
+template < typename T >
+class FormalPowerSeries
+{
+  public:
+    using  i64   = int64_t;
+    using  FPS   = FormalPowerSeries<T>;
+
+    vector<T>  a;
+
+  public:
+    constexpr FormalPowerSeries( size_t sz = 0 )  { a.resize( sz, 0 ); }
+    constexpr FormalPowerSeries( const initializer_list<T>  v )  { a = v; }
+    constexpr FormalPowerSeries( const vector<T>  &v )  { a = v; }
+    constexpr FormalPowerSeries( size_t sz, T val )  { a.resize( sz, val ); }
+    constexpr size_t  size() const { return a.size(); }
+    void  resize( size_t sz, T m = 0 )  { (*this).a.resize( sz, m ); }
+
+    constexpr FPS  operator - ( const FPS &a ) const { return  FPS(*this) -= a; }
+    constexpr FPS  operator + ( const FPS &a ) const { return  FPS(*this) += a; }
+    constexpr FPS  operator * ( const i64 a )  const { return  FPS(*this) *= a; }
+    constexpr FPS  operator * ( const FPS &a ) const { return  FPS(*this) *= a; }
+    constexpr FPS  operator / ( const FPS &a ) const { return  FPS(*this) /= a; }
+    constexpr FPS  operator % ( const FPS &a ) const { return  FPS(*this) %= a; }
+    FPS  &operator += ( const FPS &r )  {
+        this->resize( max( this->size(), r.size() ) );
+        for( size_t i=0 ; i<r.size() ; ++i )  this->a[i] += r.a[i];
+        return  *this;
+    }
+    FPS  &operator -= ( const FPS &r )  {
+        this->resize( max( this->size(), r.size() ) );
+        for( size_t i=0 ; i<r.size() ; ++i )  this->a[i] -= r.a[i];
+        return  *this;
+    }
+    FPS  &operator *= ( const i64 v )  {
+        for( size_t i=0 ; i<this->size() ; ++i )  this->a[i] *= v;
+        return  *this;
+    }
+    FPS  &operator *= ( const FPS &r )  {
+        this->convolution_inplace( r );
+        return  *this;
+    }
+    T  &operator [] ( size_t  x )  {
+        assert( x < this->a.size() );
+        return  a[x];
+    }
+    constexpr T  &operator [] ( size_t  x ) const {
+        assert( x < this->a.size() );
+        return  a[x];
+    }
+
+  private:
+    void ntt( bool inverse )  {
+        static bool  first = true;
+        static T  dw[30], idw[30];
+        if( first )  {
+            first = false;
+            T  root = 2;
+            unsigned  mod = T::get_mod();
+            while( root.pow( (mod - 1) / 2 ) == 1 )   ++root;
+            for( size_t i=0 ; i<30 ; ++i )
+                dw[i]  = -root.pow( (mod - 1) >> (i + 2) ),
+                idw[i] = T(1) / dw[i];
+        }
+        size_t  n = this->size();
+        assert( (n & (n - 1) ) == 0 );
+        if( not inverse )  {
+            for( size_t m=n ; m >>= 1 ; )  {
+                T  w = 1;
+                for( size_t s=0, k=0 ; s<n ; s+=2*m )  {
+                    for( size_t i=s, j=s+m ; i<s+m ; ++i, ++j )  {
+                        T  x = a[i],  y = a[j]*w;
+                        a[i] = x + y,  a[j] = x - y;
+                    }
+                    w *= dw[__builtin_ctz( ++k )];
+                }
+            }
+        } else {
+            for( size_t m=1 ; m<n ; m*=2 )  {
+                T  w = 1;
+                for( size_t s=0, k=0 ; s<n ; s+=2*m )  {
+                    for( size_t i=s, j=s+m ; i<s+m ; ++i, ++j )  {
+                        auto  x = a[i], y = a[j];
+                        a[i] = x + y,  a[j] = x - y,  a[j] *= w;
+                    }
+                    w *= idw[__builtin_ctz( ++k )];
+                }
+            }
+        }
+        auto  c = T( 1 ) / T( inverse ? n : 1 );
+        for( auto&& e : this->a )  e *= c;
+    }
+
+    FPS  convolution_brute( FPS &a, FPS &b ) const  {
+        size_t  n = a.size(),  m = b.size();
+        FPS  ans( n + m - 1 );
+        if( n < m )
+            for( size_t j=0 ; j<m ; ++j )
+                for( size_t i=0 ; i<n ; ++i )   ans[i+j] += a[i]*b[j];
+        else
+            for( size_t i=0 ; i<n ; ++i )
+                for( size_t j=0 ; j<m ; ++j )   ans[i+j] += a[i]*b[j];
+        return ans;
+    }
+
+    FPS&  convolution_inplace( FPS b )  {
+        if( this->size() == 0  ||  b.size() == 0 )  {
+            this->a.clear();  return  *this; }
+
+        size_t  n = this->size(),  m = b.size(),  sz = 1 << __lg( 2*(n+m-1) - 1 );
+        if( min( n, m ) <= 5 )   return  *this = convolution_brute( *this, b );
+        resize( sz ),       ntt( false );
+        b.resize( sz ),   b.ntt( false );
+        for( size_t i=0 ; i<sz ; ++i )   a[i] *= b[i];
+        ntt( true );  resize( n + m - 1 );
+        return  *this;
+    }
+};
+
+namespace  garnerMultMod2to64
+{
+  using  u32 = uint32_t;
+  using  u64 = uint64_t;
+
+  static u32  NMODS = 5;
+
+  u64  powm( u64 a, u64 i, u64 m )  {
+      u64  r = a,  res = 1;
+      while( i )  {
+          if( i & 1 )   res = res * r % m;
+          r = r * r % m;   i >>= 1;
+      }
+      return  res;
+  }
+
+  u32  invm( u32 a, u32 m )  {	return  powm( a, m - 2, m ); }
+
+  static constexpr u32  M1 = 962592769, M2 = 975175681, M3 = 976224257, M4 = 985661441, M5 = 998244353;
+  static constexpr array<u32, 5>  mods{ M1, M2, M3, M4, M5 };
+
+  using  FPS1 = FormalPowerSeries< Mint<M1> >;
+  using  FPS2 = FormalPowerSeries< Mint<M2> >;
+  using  FPS3 = FormalPowerSeries< Mint<M3> >;
+  using  FPS4 = FormalPowerSeries< Mint<M4> >;
+  using  FPS5 = FormalPowerSeries< Mint<M5> >;
+
+  vector<vector<u32>>  table_coeff;
+  vector<u32>          table_coeffinv;
+
+    void setUpGarner( u32 nmods )  {
+        NMODS = nmods;
+        table_coeff.assign( nmods + 1, vector<u32>( nmods, 1 ) );
+        for( size_t j=0 ; j<nmods ; ++j )  {
+            for( size_t k=0 ; k<nmods ; ++k )   table_coeff[j+1][k] = table_coeff[j][k];
+            for( size_t k=j+1 ; k<nmods ; ++k )
+                table_coeff[j+1][k] = (u64)table_coeff[j+1][k] * mods[j] % mods[k];
+        }
+        table_coeffinv.resize( nmods );
+        for( size_t i=0 ; i<nmods ; ++i )
+            table_coeffinv[i] = invm( table_coeff[i][i], mods[i] );
+    }
+
+    u64  garner( const vector<u32> &x )  {
+        size_t  nmods = NMODS;
+        vector<u32>  table_const( nmods );
+        u64  res = 0,  res_coeff = 1;
+        for( size_t j=0 ; j<nmods ; ++j )  {
+            u32  t = (u64)( x[j] + mods[j] - table_const[j] ) * table_coeffinv[j] % mods[j];
+            for( size_t k=j+1 ; k<nmods ; ++k )
+                table_const[k] = ( table_const[k] + (u64)table_coeff[j][k] * t ) % mods[k];
+            res += res_coeff * u64( t );
+            res_coeff *= mods[j];
+        }
+        return  res;
+    }
+
+    vector<u64>  bigMult( const vector<u64> &a, const vector<u64> &b )  {
+        size_t  n = a.size(),  m = b.size();
+
+        FPS1  a1( n ),  b1( m );
+        FPS2  a2( n ),  b2( m );
+        FPS3  a3( n ),  b3( m );
+        FPS4  a4( n ),  b4( m );
+        FPS5  a5( n ),  b5( m );
+
+        for( size_t i=0 ; i<a.size() ; ++i )  {
+            u64  x = a[i];
+            switch( NMODS )  {
+              case  5:  a5[i] = x % M5;
+              case  4:  a4[i] = x % M4;
+              case  3:  a3[i] = x % M3;
+              case  2:  a2[i] = x % M2;
+              case  1:  a1[i] = x % M1;
+            }
+	    }
+        for( size_t i=0 ; i<b.size() ; ++i )  {
+            u64  x = b[i];
+            switch( NMODS )  {
+              case  5:  b5[i] = x % M5;
+              case  4:  b4[i] = x % M4;
+              case  3:  b3[i] = x % M3;
+              case  2:  b2[i] = x % M2;
+              case  1:  b1[i] = x % M1;
+            }
+        }
+
+        switch( NMODS )  {
+          case  5:  a5 *= b5;
+          case  4:  a4 *= b4;
+          case  3:  a3 *= b3;
+          case  2:  a2 *= b2;
+          case  1:  a1 *= b1;
+        }
+
+        vector<u64>  res( a1.size() );
+	    for( size_t i=0 ; i<a1.size() ; ++i )
+            res[i] = garner( { a1.a[i].get(), a2.a[i].get(), a3.a[i].get(), a4.a[i].get(),
+                               a5.a[i].get() } );
+        return  res;
+    }
+};
+using namespace  garnerMultMod2to64;
+
+
+int main()
+{
+    ios_base::sync_with_stdio( false );
+    cin.tie( nullptr );
+
+    setUpGarner( 5 );                  // REQUIRED
+
+    size_t  n, m;
+    cin >> n >> m;
+
+    vector<u64>  a( n ),  b( m );
+
+    for( auto &x : a )  cin >> x;
+    for( auto &x : b )  cin >> x;
+
+    auto  ans = bigMult( a, b );
+
+    for( auto &x : ans )  cout << x << ' ';
+    cout << '\n';
+
+    return  0;
+}
