@@ -1,3 +1,5 @@
+// INPUT LIKE https://judge.yosupo.jp/submission/231460
+// BUT ADD MOD ( 1 < MOD < 2^64 ) TO INPUT FILE
 #include <cstdint>
 #include <iostream>
 #include <vector>
