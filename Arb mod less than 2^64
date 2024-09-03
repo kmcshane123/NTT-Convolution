@@ -221,7 +221,7 @@ namespace  garnerMultMod2to64
   using  u64 = uint64_t;
 
   static u32  NMODS = 5;
-  static u32  MOD   = 1000000007;
+  static u64  MOD   = 1045430273;
 
   u64  powm( u64 a, u64 i, u64 m )  {
       u64  r = a,  res = 1;
@@ -247,9 +247,7 @@ namespace  garnerMultMod2to64
   vector<vector<u32>>  table_coeff;
   vector<u32>          table_coeffinv;
 
-    void setUpGarner( u32 nmods, u64 mod )  {
-        NMODS = nmods;
-        MOD   = mod;
+    void setUpGarner( u32 nmods )  {
         table_coeff.assign( nmods + 1, vector<u32>( nmods, 1 ) );
         for( size_t j=0 ; j<nmods ; ++j )  {
             for( size_t k=0 ; k<nmods ; ++k )   table_coeff[j+1][k] = table_coeff[j][k];
@@ -261,7 +259,7 @@ namespace  garnerMultMod2to64
             table_coeffinv[i] = invm( table_coeff[i][i], mods[i] );
     }
 
-      garner( const vector<u32> &x )  {
+    u64  garner( const vector<u32> &x )  {
         size_t  nmods = NMODS;
         vector<u32>  table_const( nmods );
         u64  res_coeff = 1;
@@ -276,7 +274,18 @@ namespace  garnerMultMod2to64
         return  res;
     }
 
-    vector<u64>  bigMult( const vector<u64> &a, const vector<u64> &b )  {
+    static bool  initialized = false;
+
+    void  setModGarner( u64 mod, u32 nmods = 5 )  {
+        if( !initialized )  {
+            initialized = true;
+            setUpGarner( 5 );
+        }
+        MOD   = mod;
+        NMODS = nmods;
+    }
+
+    vector<u64>  convolve( const vector<u64> &a, const vector<u64> &b )  {
         size_t  n = a.size(),  m = b.size();
 
         FPS1  a1( n ),  b1( m );
@@ -329,21 +338,34 @@ int main()
     ios_base::sync_with_stdio( false );
     cin.tie( nullptr );
 
-    u64     mod;
     size_t  n, m;
-    cin >> n >> m >> mod;
-
-    setUpGarner( 5, mod );                  // REQUIRED
+    cin >> n >> m;
 
     vector<u64>  a( n ),  b( m );
 
     for( auto &x : a )  cin >> x;
     for( auto &x : b )  cin >> x;
 
-    auto  ans = bigMult( a, b );
+    setModGarner( 1000000007, 3 );
+
+    auto  ans = convolve( a, b );
+
+    for( auto &x : ans )  cout << x << ' ';
+    cout << '\n';
+/**
+    setModGarner( 1000000000000001 );
+
+    ans = convolve( a, b );
 
     for( auto &x : ans )  cout << x << ' ';
     cout << '\n';
 
+    setModGarner( 18446744073709551615 );
+
+    ans = convolve( a, b );
+
+    for( auto &x : ans )  cout << x << ' ';
+    cout << '\n';
+**/
     return  0;
 }
