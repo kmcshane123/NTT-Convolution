@@ -223,7 +223,7 @@ namespace  garner
   static u32  NMODS = 5;
   static u64  MOD   = 1045430273;
 
-  u64  powm( u64 a, u64 i, u64 m )  {
+  static u64  powm( u64 a, u64 i, u64 m )  {
       u64  r = a,  res = 1;
       while( i )  {
           if( i & 1 )   res = res * r % m;
@@ -232,7 +232,7 @@ namespace  garner
       return  res;
   }
 
-  u32  invm( u32 a, u32 m )  {	return  powm( a, m - 2, m ); }
+  static u32  invm( u32 a, u32 m )  {	return  powm( a, m - 2, m ); }
 
   static constexpr u32  M1 = 1045430273, M2 = 1051721729, M3 = 1053818881, M4 = 120586241,
                         M5 = 167772161;
@@ -248,7 +248,7 @@ namespace  garner
   static vector<u32>          table_coeffinv;
   static bool  initialized = false;
 
-    void setUpGarner( u32 nmods )  {
+    static void setUpGarner( u32 nmods )  {
         table_coeff.assign( nmods + 1, vector<u32>( nmods, 1 ) );
         for( size_t j=0 ; j<nmods ; ++j )  {
             for( size_t k=0 ; k<nmods ; ++k )   table_coeff[j+1][k] = table_coeff[j][k];
@@ -260,7 +260,7 @@ namespace  garner
             table_coeffinv[i] = invm( table_coeff[i][i], mods[i] );
     }
 
-    u64  garner( const vector<u32> &x )  {
+    static u64  garner( const vector<u32> &x )  {
         size_t  nmods = NMODS;
         vector<u32>  table_const( nmods );
         u64  res_coeff = 1;
@@ -275,7 +275,7 @@ namespace  garner
         return  res;
     }
 
-    void  setModGarner( u64 mod, u32 nmods = 5 )  {
+    static void  setModGarner( u64 mod, u32 nmods = 5 )  {
         if( !initialized )  {
             initialized = true;
             setUpGarner( 5 );    // 5 WORKS FOR ALL LEGAL CHOICES FOR nmods, SO USE 5 HERE
@@ -284,7 +284,7 @@ namespace  garner
         NMODS = nmods;
     }
 
-    vector<u64>  convolve( const vector<u64> &a, const vector<u64> &b )  {
+    static vector<u64>  convolve( const vector<u64> &a, const vector<u64> &b )  {
         size_t  n = a.size(),  m = b.size();
 
         FPS1  a1( n ),  b1( m );
@@ -323,9 +323,9 @@ namespace  garner
         }
 
         vector<u64>  res( a1.size() );
-	    for( size_t i=0 ; i<a1.size() ; ++i )
-            res[i] = garner( { a1.a[i].get(), a2.a[i].get(), a3.a[i].get(), a4.a[i].get(),
-                               a5.a[i].get() } );
+        for( size_t i=0 ; i<a1.size() ; ++i )
+        res[i] = garner( { a1.a[i].get(), a2.a[i].get(), a3.a[i].get(), a4.a[i].get(),
+                           a5.a[i].get() } );
         return  res;
     }
 };
