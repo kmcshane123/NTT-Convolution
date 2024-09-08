@@ -32,10 +32,12 @@ class  Mint
     static_assert( (mod & 1) == 1, "invalid, mod % 2 == 0" );
 
   public:
+    // CONSTRUCTORS
     constexpr Mint() : a( 0 ) {}
     constexpr Mint( i64 b )
         : a( reduce( u64( b % mod + mod ) * n2 ) ) {};
 
+    // ARITMETIC OPERATORS
     constexpr Mint &operator += ( const Mint &b )  {
         if( i32( a += b.a - 2 * mod ) < 0 )   a += 2 * mod;
         return  *this;
@@ -80,6 +82,7 @@ class  Mint
         return ( a >= mod ? a - mod : a ) != ( b.a >= mod ? b.a - mod : b.a );
     }
 
+    // INPUT AND OUTPUT
     friend ostream &operator << ( ostream &os, const Mint &b )  {
         return  os << b.get();
     }
@@ -98,6 +101,7 @@ class FormalPowerSeries
     using  FPS   = FormalPowerSeries<T>;
     using  VPoly = vector<FPS>;
 
+    // CLASS DATA
 	vector<T>  a;
 
   public:
