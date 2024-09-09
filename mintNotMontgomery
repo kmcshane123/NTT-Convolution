@@ -1,0 +1,76 @@
+#include <cstdint>
+#include <iostream>
+#include <vector>
+#include <algorithm>
+#include <array>
+#include <cassert>
+using namespace std;
+
+template <unsigned MOD>
+class Mint
+{
+  public:
+    unsigned  v;
+
+  public:
+    using  i64 = int64_t;
+    using  u64 = uint64_t;
+    using  M   = Mint;
+
+    Mint( i64 a = 0 ) : v( a >= 0 ? ( a < MOD ? a : a% MOD )
+	                 : a %MOD + MOD ) {}
+    int  getInt()   const { return  int( v ); }
+    int operator () ()   const { return  int( v ); }
+    M operator    - ()   const { return M() -= *this; }
+    M& operator += (M r) { if ((v += r.v) >= MOD) v -= MOD;
+                         return *this; }
+    M& operator -= (M r) { if ((v += MOD - r.v) >= MOD) v -= MOD;
+                         return *this; }
+    M& operator *= (M r) { v = (i64)v * r.v % MOD;  return *this; }
+    M& operator /= (M r) { return *this *= power( r, MOD - 2 ); }
+    M& operator ++ ()    { return *this += M( 1 ); }
+    M& operator -- ()    { return *this -= M( 1 ); }
+
+    M pow( u64 k ) const  { return power( *this, k ); }
+    M inv() const        { return pow( MOD - 2 ); }
+    friend M operator + (M l, M r) { return l += r; }
+    friend M operator - (M l, M r) { return l -= r; }
+    friend M operator * (M l, M r) { return l *= r; }
+    friend M operator / (M l, M r) { return l /= r; }
+    friend bool operator == (M l, M r) { return l.v == r.v; }
+    friend bool operator != (M l, M r) { return l.v != r.v; }
+    bool operator < (const M & rhs) const { return v < rhs.v; }
+    bool operator > (const M & rhs) const { return v > rhs.v; }
+    friend M  power( M b, i64 e )  {
+        M  r = 1;
+        for( ; e>0 ; e>>=1i64 ) { if( e & 1i64 )  r *= b;  b *= b; }
+        return  r;
+    }
+    int  legendre()  { return  pow( (MOD - 1)>>1 ).v; }
+    int  tonelli()  {  // RETURNS -1 IF NO INV, ELSE CAST TO Mint
+        if( v == 0 )            return   0;
+        if( legendre() != 1 )   return  -1;
+        int  s = 0,  q = MOD - 1;
+        while( q %2 == 0 )  { q >>= 1;  ++s; }
+        if( s == 1 )   return  pow( (MOD + 1)>>2 ).v;
+        M  z = 2,  val = MOD - 1;
+        for( ; z != Mint( 0 ) ; ++z )
+            if( val == z.legendre() )   break;
+        M  c = power( z, q );    M  r = pow( (q + 1)>>1 );
+        M  t = pow( q );         int  m = s;
+        while( t.v != 1 )  {
+            z = t*t;   int  i = 1;
+            for( ; i<s ; ++i )  {
+                if( z.v == 1 )    break;
+                z *= z; }
+            auto  b = power( c, 1 << (m - i - 1) );
+            r *= b;  c = b*b;  t *= c;  m = i; }
+        return  min( r.v, MOD - r.v );
+    }
+    friend M  fastMul( M A, M B, M C, M D )  {
+        return  u64( A.v ) * B.v + u64( C.v ) * D.v;  }
+    friend ostream& operator << ( ostream& os, M a )
+    { return os << a.v; }
+    friend istream& operator >> ( istream& is, M &a )
+    { u64 w;  is >> w;  a = M( w );  return is; }
+};
