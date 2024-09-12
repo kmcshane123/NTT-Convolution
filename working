@@ -324,10 +324,10 @@ class FormalPowerSeriesArb : public FormalPowerSeries<T>
     constexpr FormalPowerSeriesArb()  { init(); }
     constexpr FormalPowerSeriesArb( const initializer_list<T>  v )  { FPSB::a = v; init(); }
 
-    constexpr FPSA  operator * ( const FPSA &a ) const { return  FPSA(*this) *= a; }
+    FPSA  operator * ( FPSA &A )  { return  (*this) *= A; }
 
-    FPSA  &operator *= ( const FPSA &r )  {
-        this->convolution_inplace( r );
+    FPSA  &operator *= ( FPSA &r )  {
+        FPSA::convolution_inplace( r );
         return  *this;
     }
 
@@ -340,17 +340,29 @@ class FormalPowerSeriesArb : public FormalPowerSeries<T>
         }
     }
 
+    FPSA  convolution_brute( FPSA &a, FPSA &b ) {
+        size_t  n = a.size(),  m = b.size();
+        FPSA  ans( n + m - 1 );
+        if( n < m )
+            for( size_t j=0 ; j<m ; ++j )
+                for( size_t i=0 ; i<n ; ++i )   ans[i+j] += a[i]*b[j];
+        else
+            for( size_t i=0 ; i<n ; ++i )
+                for( size_t j=0 ; j<m ; ++j )   ans[i+j] += a[i]*b[j];
+        return ans;
+    }
+
     FPSA&  convolution_inplace( FPSA b )  {
         if( this->size() == 0  ||  b.size() == 0 )  {
             this->a.clear();  return  *this; }
 
         size_t  n = this->size(),  m = b.size(),  sz = 1 << __lg( 2*(n+m-1) - 1 );
         if( min( n, m ) <= 60 )  {
-            auto  K = FPSB::convolution_brute( *this, b );
+            auto  K = convolution_brute( (*this), b );
             (*this).a = K.a;
             return  *this;
         }
-        
+
     }
 
     static u64  powm( u64 a, u64 i, u64 m )  {
@@ -376,10 +388,8 @@ class FormalPowerSeriesArb : public FormalPowerSeries<T>
         for( size_t i=0 ; i<nmods ; ++i )
             table_coeffinv[i] = invm( table_coeff[i][i], mods[i] );
     }
-};
-/**
+
     static u64  garner( const vector<u32> &x )  {
-        size_t  nmods = NMODS;
         vector<u32>  table_const( nmods );
         u64  res_coeff = 1;
         u64  res = 0;
@@ -387,19 +397,10 @@ class FormalPowerSeriesArb : public FormalPowerSeries<T>
             u64  t = (u64)( x[j] + mods[j] - table_const[j] ) * table_coeffinv[j] % mods[j];
             for( size_t k=j+1 ; k<nmods ; ++k )
                 table_const[k] = ( table_const[k] + (u64)table_coeff[j][k] * t ) % mods[k];
-            res = ( res + res_coeff * u64( t ) ) %MOD;
-            res_coeff = res_coeff * mods[j] %MOD;
+            res = ( res + res_coeff * u64( t ) ) %T::mod;
+            res_coeff = res_coeff * mods[j] %T::mod;
         }
         return  res;
-    }
-
-    static void  setModGarner( u64 mod, u32 nmods = 5 )  {
-        if( !initialized )  {
-            initialized = true;
-            setUpGarner( 5 );    // 5 WORKS FOR ALL LEGAL CHOICES FOR nmods, SO USE 5 HERE
-        }
-        MOD   = mod;
-        NMODS = nmods;
     }
 
     static vector<u64>  convolve( const vector<u64> &a, const vector<u64> &b )  {
@@ -413,7 +414,7 @@ class FormalPowerSeriesArb : public FormalPowerSeries<T>
 
         for( size_t i=0 ; i<a.size() ; ++i )  {
             u64  x = a[i];
-            switch( NMODS )  {
+            switch( nmods )  {
               case  5:  a5[i] = x %M5;
               case  4:  a4[i] = x %M4;
               case  3:  a3[i] = x %M3;
@@ -423,7 +424,7 @@ class FormalPowerSeriesArb : public FormalPowerSeries<T>
 	    }
         for( size_t i=0 ; i<b.size() ; ++i )  {
             u64  x = b[i];
-            switch( NMODS )  {
+            switch( nmods )  {
               case  5:  b5[i] = x %M5;
               case  4:  b4[i] = x %M4;
               case  3:  b3[i] = x %M3;
@@ -432,7 +433,7 @@ class FormalPowerSeriesArb : public FormalPowerSeries<T>
             }
         }
 
-        switch( NMODS )  {
+        switch( nmods )  {
           case  5:  a5 *= b5;
           case  4:  a4 *= b4;
           case  3:  a3 *= b3;
@@ -447,7 +448,6 @@ class FormalPowerSeriesArb : public FormalPowerSeries<T>
         return  res;
     }
 };
-**/
 
 using  FPSA = FormalPowerSeriesArb< Mint<1000000007>, 3 >;
 
