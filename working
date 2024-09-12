@@ -122,7 +122,7 @@ class FormalPowerSeries
         assert( x < this->a.size() );
         return  a[x];
     }
-    constexpr T  &operator [] ( size_t  x ) const {
+    constexpr T  operator [] ( size_t  x ) const {
         assert( x < this->a.size() );
         return  a[x];
     }
@@ -211,7 +211,19 @@ class FormalPowerSeries
         return  size() == 0 ? (*this) = FPS( { 0 } ) : (*this );
     }
 
-  public:
+    FPS  convolution_brute(const FPS &a, const FPS &b ) const  {
+        size_t  n = a.size(),  m = b.size();
+        FPS  ans( n + m - 1 );
+        if( n < m )
+            for( size_t j=0 ; j<m ; ++j )
+                for( size_t i=0 ; i<n ; ++i )   ans[i+j] += a[i]*b[j];
+        else
+            for( size_t i=0 ; i<n ; ++i )
+                for( size_t j=0 ; j<m ; ++j )   ans[i+j] += a[i]*b[j];
+        return ans;
+    }
+
+  private:
     constexpr FPS  low( int s ) const  {
         return FPS( { a.begin(), a.begin() + min( max( s, 1 ), int( size() ) ) } );
     }
@@ -269,18 +281,6 @@ class FormalPowerSeries
         for( auto&& e : this->a )  e *= c;
     }
 
-    FPS  convolution_brute( FPS &a, FPS &b ) const  {
-        size_t  n = a.size(),  m = b.size();
-        FPS  ans( n + m - 1 );
-        if( n < m )
-            for( size_t j=0 ; j<m ; ++j )
-                for( size_t i=0 ; i<n ; ++i )   ans[i+j] += a[i]*b[j];
-        else
-            for( size_t i=0 ; i<n ; ++i )
-                for( size_t j=0 ; j<m ; ++j )   ans[i+j] += a[i]*b[j];
-        return ans;
-    }
-
     FPS&  convolution_inplace( FPS b )  {
         if( this->size() == 0  ||  b.size() == 0 )  {
             this->a.clear();  return  *this; }
@@ -303,9 +303,8 @@ class FormalPowerSeriesArb : public FormalPowerSeries<T>
     using  u32 = uint32_t;   using  u64 = uint64_t;
     using  FPSA = FormalPowerSeriesArb<T, nmods>;
 
-    static constexpr u32  M1 = 1045430273, M2 = 1051721729, M3 = 1053818881,
-                          M4 = 120586241,  M5 = 167772161;
-    static constexpr array<u32, 5>  mods{ M1, M2, M3, M4, M5 };
+    static constexpr u32  M1 = 1045430273, M2 = 1051721729, M3 = 1053818881;
+    static constexpr array<u32, 3>  mods{ M1, M2, M3 };
     inline static vector<vector<u32>>  table_coeff;
     inline static vector<u32>          table_coeffinv;
 
@@ -313,8 +312,6 @@ class FormalPowerSeriesArb : public FormalPowerSeries<T>
     using  FPS1 = FormalPowerSeries< Mint<M1> >;
     using  FPS2 = FormalPowerSeries< Mint<M2> >;
     using  FPS3 = FormalPowerSeries< Mint<M3> >;
-    using  FPS4 = FormalPowerSeries< Mint<M4> >;
-    using  FPS5 = FormalPowerSeries< Mint<M5> >;
 
   public:
     // CONSTRUCTORS
@@ -326,7 +323,7 @@ class FormalPowerSeriesArb : public FormalPowerSeries<T>
 
     FPSA  operator * ( FPSA &A )  { return  (*this) *= A; }
 
-    FPSA  &operator *= ( FPSA &r )  {
+    FPSA  &operator *= ( const FPSA &r )  {
         FPSA::convolution_inplace( r );
         return  *this;
     }
@@ -340,16 +337,17 @@ class FormalPowerSeriesArb : public FormalPowerSeries<T>
         }
     }
 
-    FPSA&  convolution_inplace( FPSA b )  {
+    FPSA  convolution_inplace( const FPSA &b )  {
         if( this->size() == 0  ||  b.size() == 0 )  {
             this->a.clear();  return  *this; }
 
         size_t  n = this->size(),  m = b.size();
-        if( min( n, m ) <= 60 )  {
+        if( min( n, m ) <=  25 )  {
             auto  G = FPSB::convolution_brute( (*this), b );
             (*this).a = G.a;
             return  (*this);
         }
+        return  convolve( (*this), b );
     }
 
     static u64  powm( u64 a, u64 i, u64 m )  {
@@ -384,36 +382,31 @@ class FormalPowerSeriesArb : public FormalPowerSeries<T>
             u64  t = (u64)( x[j] + mods[j] - table_const[j] ) * table_coeffinv[j] % mods[j];
             for( size_t k=j+1 ; k<nmods ; ++k )
                 table_const[k] = ( table_const[k] + (u64)table_coeff[j][k] * t ) % mods[k];
-            res = ( res + res_coeff * u64( t ) ) %T::mod;
-            res_coeff = res_coeff * mods[j] %T::mod;
+            res = ( res + res_coeff * u64( t ) ) %T::get_mod();
+            res_coeff = res_coeff * mods[j] %T::get_mod();
         }
         return  res;
     }
 
-    static vector<u64>  convolve( const vector<u64> &a, const vector<u64> &b )  {
-        size_t  n = a.size(),  m = b.size();
+    static FPSA  convolve( const FPSA &A, const FPSA &B )  {
+        size_t  n = A.size(),  m = B.size();
 
         FPS1  a1( n ),  b1( m );
         FPS2  a2( n ),  b2( m );
         FPS3  a3( n ),  b3( m );
-        FPS4  a4( n ),  b4( m );
-        FPS5  a5( n ),  b5( m );
 
-        for( size_t i=0 ; i<a.size() ; ++i )  {
-            u64  x = a[i];
+        for( size_t i=0 ; i<n ; ++i )  {
+            u64  x = A[i].get();
             switch( nmods )  {
-              case  5:  a5[i] = x %M5;
-              case  4:  a4[i] = x %M4;
               case  3:  a3[i] = x %M3;
               case  2:  a2[i] = x %M2;
               case  1:  a1[i] = x %M1;
             }
 	    }
-        for( size_t i=0 ; i<b.size() ; ++i )  {
-            u64  x = b[i];
+        for( size_t i=0 ; i<m ; ++i )  {
+            u64  x = B[i].get();
             switch( nmods )  {
-              case  5:  b5[i] = x %M5;
-              case  4:  b4[i] = x %M4;
+
               case  3:  b3[i] = x %M3;
               case  2:  b2[i] = x %M2;
               case  1:  b1[i] = x %M1;
@@ -421,34 +414,40 @@ class FormalPowerSeriesArb : public FormalPowerSeries<T>
         }
 
         switch( nmods )  {
-          case  5:  a5 *= b5;
-          case  4:  a4 *= b4;
           case  3:  a3 *= b3;
           case  2:  a2 *= b2;
           case  1:  a1 *= b1;
         }
 
-        vector<u64>  res( a1.size() );
+        FPSA  res( a1.size() );
         for( size_t i=0 ; i<a1.size() ; ++i )
-        res[i] = garner( { a1.a[i].get(), a2.a[i].get(), a3.a[i].get(), a4.a[i].get(),
-                           a5.a[i].get() } );
+        res.a[i] = garner( { a1.a[i].get(), a2.a[i].get(), a3.a[i].get() } );
         return  res;
     }
 };
 
+u32  MOD = 1000000007;
 using  F = FormalPowerSeriesArb< Mint<1000000007>, 3 >;
 
 
-int main()
-{
+int main()  {
     ios_base::sync_with_stdio( false );
     cin.tie( nullptr );
 
-    F  A;
-    F  B( { 6, 6, 6 } );
-    F  C( { 5, 5, 5 } );
-    A = C * B;
-    cout << A << endl;
+    size_t  n, m;
+    cin >> n >> m;
+
+    vector<u64>  a( n ),  b( m );
+    for( auto &x : a )  cin >> x;
+    for( auto &x : b )  cin >> x;
+
+    F  A( n ),  B( m );
+    for( int i=0 ;i<n ; ++i )  A[i] = a[i] %MOD;
+    for( int i=0 ;i<m ; ++i )  B[i] = b[i] %MOD;
+
+    auto  ans = A * B;
+
+    cout << ans << '\n';
 
     return  0;
 }
