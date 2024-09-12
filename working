@@ -340,29 +340,16 @@ class FormalPowerSeriesArb : public FormalPowerSeries<T>
         }
     }
 
-    FPSA  convolution_brute( FPSA &a, FPSA &b ) {
-        size_t  n = a.size(),  m = b.size();
-        FPSA  ans( n + m - 1 );
-        if( n < m )
-            for( size_t j=0 ; j<m ; ++j )
-                for( size_t i=0 ; i<n ; ++i )   ans[i+j] += a[i]*b[j];
-        else
-            for( size_t i=0 ; i<n ; ++i )
-                for( size_t j=0 ; j<m ; ++j )   ans[i+j] += a[i]*b[j];
-        return ans;
-    }
-
     FPSA&  convolution_inplace( FPSA b )  {
         if( this->size() == 0  ||  b.size() == 0 )  {
             this->a.clear();  return  *this; }
 
-        size_t  n = this->size(),  m = b.size(),  sz = 1 << __lg( 2*(n+m-1) - 1 );
+        size_t  n = this->size(),  m = b.size();
         if( min( n, m ) <= 60 )  {
-            auto  K = convolution_brute( (*this), b );
-            (*this).a = K.a;
-            return  *this;
+            auto  G = FPSB::convolution_brute( (*this), b );
+            (*this).a = G.a;
+            return  (*this);
         }
-
     }
 
     static u64  powm( u64 a, u64 i, u64 m )  {
@@ -449,17 +436,19 @@ class FormalPowerSeriesArb : public FormalPowerSeries<T>
     }
 };
 
-using  FPSA = FormalPowerSeriesArb< Mint<1000000007>, 3 >;
+using  F = FormalPowerSeriesArb< Mint<1000000007>, 3 >;
+
 
 int main()
 {
     ios_base::sync_with_stdio( false );
     cin.tie( nullptr );
 
-    FPSA  A;
-    FPSA  B( { 6, 6, 6 } );
-    FPSA  C( { 5, 5, 5 } );
-    cout << C * B << endl;
+    F  A;
+    F  B( { 6, 6, 6 } );
+    F  C( { 5, 5, 5 } );
+    A = C * B;
+    cout << A << endl;
 
     return  0;
 }
