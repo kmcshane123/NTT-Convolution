@@ -296,15 +296,12 @@ class FormalPowerSeries
 };
 
 template < typename T, u32 nmods = 3 >
-class FormalPowerSeriesArb
+class FormalPowerSeriesArb : public FormalPowerSeries<T>
 {
   public:
     using  i32 = int32_t;    using  i64 = int64_t;
     using  u32 = uint32_t;   using  u64 = uint64_t;
-    using  FPS = FormalPowerSeriesArb<T, nmods>;
-
-    // CLASS DATA
-	vector<T>  a;
+    using  FPSA = FormalPowerSeriesArb<T, nmods>;
 
     static constexpr u32  M1 = 1045430273, M2 = 1051721729, M3 = 1053818881,
                           M4 = 120586241,  M5 = 167772161;
@@ -312,6 +309,7 @@ class FormalPowerSeriesArb
     inline static vector<vector<u32>>  table_coeff;
     inline static vector<u32>          table_coeffinv;
 
+    using  FPSB = FormalPowerSeries<T>;
     using  FPS1 = FormalPowerSeries< Mint<M1> >;
     using  FPS2 = FormalPowerSeries< Mint<M2> >;
     using  FPS3 = FormalPowerSeries< Mint<M3> >;
@@ -320,9 +318,13 @@ class FormalPowerSeriesArb
 
   public:
     // CONSTRUCTORS
-    constexpr FormalPowerSeriesArb( size_t sz = 0 )  { a.resize( sz, 0 ); init(); }
-    constexpr FormalPowerSeriesArb( const initializer_list<T>  v )  { a = v; init(); }
-    constexpr size_t  size() const { return a.size(); init(); }
+    constexpr FormalPowerSeriesArb( size_t sz )  { FPSB::a.resize( sz, 0 );  init(); }
+    constexpr FormalPowerSeriesArb( const vector<T>  &v )  { FPSB::a = v;  init(); }
+    constexpr FormalPowerSeriesArb( size_t sz, T val )  { FPSB::a.resize( sz, val );  init(); }
+    constexpr FormalPowerSeriesArb()  { init(); }
+    constexpr FormalPowerSeriesArb( const initializer_list<T>  v )  { FPSB::a = v; init(); }
+
+  public:
     static void  init()  {
         static bool  initialized = false;
         if( !initialized )  {
@@ -331,102 +333,18 @@ class FormalPowerSeriesArb
         }
     }
 
+    static u64  powm( u64 a, u64 i, u64 m )  {
+        u64  r = a,  res = 1;
+        while( i )  {
+            if( i & 1 )   res = res * r % m;
+            r = r * r % m;   i >>= 1;
+        }
+        return  res;
+    }
+
+    static u32  invm( u32 a, u32 m )  {	return  powm( a, m - 2, m ); }
     void  resize( size_t sz, T m = 0 )  { (*this).a.resize( sz, m ); }
 
-    T  &operator [] ( size_t  x )  {
-        assert( x < this->a.size() );
-        return  a[x];
-    }
-    constexpr T  &operator [] ( size_t  x ) const {
-        assert( x < this->a.size() );
-        return  a[x];
-    }
-
-    // INPUT AND OUTPUT
-    friend std::ostream &operator << ( std::ostream &os, const FPS &p )  {
-        for( auto &v : p.a )   os << v << " ";
-        return  os;
-    }
-    friend istream& operator >> ( istream& is, FPS &p )  {
-	    for( auto &v : p.a )  { i64 w;  is >> w;  v = w; }   return  is;
-    }
-
-    // MATHEMATICAL OPERATORS
-    constexpr FPS  operator - ( const FPS &a ) const { return  FPS(*this) -= a; }
-    constexpr FPS  operator + ( const FPS &a ) const { return  FPS(*this) += a; }
-    constexpr FPS  operator * ( const i64 a  ) const { return  FPS(*this) *= a; }
-    constexpr FPS  operator * ( const FPS &a ) const { return  FPS(*this) *= a; }
-    constexpr FPS  operator / ( const FPS &a ) const { return  FPS(*this) /= a; }
-    constexpr FPS  operator % ( const FPS &a ) const { return  FPS(*this) %= a; }
-    FPS  &operator += ( const FPS &r )  {
-        this->resize( max( this->size(), r.size() ) );
-        for( size_t i=0 ; i<r.size() ; ++i )  this->a[i] += r.a[i];
-        return  *this;
-    }
-    FPS  &operator -= ( const FPS &r )  {
-        this->resize( max( this->size(), r.size() ) );
-        for( size_t i=0 ; i<r.size() ; ++i )  this->a[i] -= r.a[i];
-        return  *this;
-    }
-    FPS  &operator *= ( const i64 v )  {
-        for( size_t i=0 ; i<this->size() ; ++i )  this->a[i] *= v;
-        return  *this;
-    }
-    FPS  &operator *= ( const FPS &r )  {
-        this->convolution_inplace( r );
-        return  *this;
-    }
-    FPS  &operator /= ( const FPS &r )  {  // = Q OF POLY DIVISION
-        if( size() < r.size() )   return *this = FPS( 0 );
-        int  n = this->size() - r.size() + 1;
-        if( (int)r.size() <= 32 )  {
-            FPS  f( *this ),  g( r );
-            g.shrink();
-            int  coeff = g.a.back().inv().v;
-            g *= coeff;
-            int  deg = (int)f.size() - (int)g.size() + 1;
-            int  gs  = g.size();
-            FPS  quo( deg );
-            for( int i=deg-1 ; i>=0 ; --i )  {
-                quo[i] = f[i+gs-1];
-                for( int j=0 ; j<gs ; ++j )  f[i+j] -= quo[i] * g[j];
-            }
-            *this = quo * coeff;
-            this->resize( n, 0 );
-            return *this;
-        }
-        return *this = ( (*this).rev().low( n ) * r.rev().inverse( n ) ).low( n ).rev();
-    }
-    FPS  &operator %= ( const FPS &Q )  {
-        if( Q.size() > size() )  return *this;
-        if( Q.size() < 128 )  {
-            int  dQ = Q.size() - 1;
-            while( dQ  &&  Q[dQ] == 0 )  --dQ;
-            assert( Q[dQ] != 0 );
-            for( int i=size()-1 ; i>=dQ ; --i ) {
-                if( a[i] == 0 )  continue;
-                T  x = a[i] / Q[dQ];
-                a[i] = 0;
-                for( int j=1 ; j<=dQ ; ++j )
-                    a[i-j] -= x * Q[dQ - j];
-            }
-            shrink();
-            return  *this;
-        }
-        FPS  P = (*this) / Q;
-        P *= Q;
-        int  dR = -1;
-        for( int i=0 ; i<Q.size()-1 ; ++i )  {
-            P.a[i] = a[i] - P[i];
-            if( P[i] != 0 )  dR = i;
-        }
-        a.resize( dR + 1 );
-        for( int i=0 ; i<=dR ; ++i )  a[i] = P[i];
-        shrink();
-        return  size() == 0 ? (*this) = FPS( { 0 } ) : (*this );
-    }
-
-  private:
     static void setUpGarner()  {
         table_coeff.assign( nmods + 1, vector<u32>( nmods, 1 ) );
         for( size_t j=0 ; j<nmods ; ++j )  {
@@ -438,80 +356,8 @@ class FormalPowerSeriesArb
         for( size_t i=0 ; i<nmods ; ++i )
             table_coeffinv[i] = invm( table_coeff[i][i], mods[i] );
     }
-
-   static u64  powm( u64 a, u64 i, u64 m )  {
-      u64  r = a,  res = 1;
-      while( i )  {
-          if( i & 1 )   res = res * r % m;
-          r = r * r % m;   i >>= 1;
-      }
-      return  res;
-  }
-
-  static u32  invm( u32 a, u32 m )  {	return  powm( a, m - 2, m ); }
-
-    constexpr FPS  low( int s ) const  {
-        return FPS( { a.begin(), a.begin() + min( max( s, 1 ), int( size() ) ) } );
-    }
-    void shrink()  { while( a.size()  &&  a.back() == 0 )  a.pop_back(); }
-    FPS  rev() const  {
-        FPS  ret( *this );
-        reverse( ret.a.begin(), ret.a.end() );
-        return ret;
-    }
-    constexpr FPS  shift( int x )  {
-        FPS  ret = *this;
-        if( x >= 0 )   ret.a.insert( begin( ret.a ), x, 0 );
-        else  ret.a.erase( begin( ret.a ), begin( ret.a ) - x );
-        return  ret;
-    }
 };
 /**
-namespace  garner
-{
-  using  u32 = uint32_t;
-  using  u64 = uint64_t;
-
-  static u32  NMODS = 5;
-  static u64  MOD   = 1045430273;
-
-  static u64  powm( u64 a, u64 i, u64 m )  {
-      u64  r = a,  res = 1;
-      while( i )  {
-          if( i & 1 )   res = res * r % m;
-          r = r * r % m;   i >>= 1;
-      }
-      return  res;
-  }
-
-  static u32  invm( u32 a, u32 m )  {	return  powm( a, m - 2, m ); }
-
-  static constexpr u32  M1 = 1045430273, M2 = 1051721729, M3 = 1053818881, M4 = 120586241,
-                        M5 = 167772161;
-  static constexpr array<u32, 5>  mods{ M1, M2, M3, M4, M5 };
-
-  using  FPS1 = FormalPowerSeries< Mint<M1> >;
-  using  FPS2 = FormalPowerSeries< Mint<M2> >;
-  using  FPS3 = FormalPowerSeries< Mint<M3> >;
-  using  FPS4 = FormalPowerSeries< Mint<M4> >;
-  using  FPS5 = FormalPowerSeries< Mint<M5> >;
-
-  static vector<vector<u32>>  table_coeff;
-  static vector<u32>          table_coeffinv;
-  static bool  initialized = false;
-
-    static void setUpGarner( u32 nmods )  {
-        table_coeff.assign( nmods + 1, vector<u32>( nmods, 1 ) );
-        for( size_t j=0 ; j<nmods ; ++j )  {
-            for( size_t k=0 ; k<nmods ; ++k )   table_coeff[j+1][k] = table_coeff[j][k];
-            for( size_t k=j+1 ; k<nmods ; ++k )
-                table_coeff[j+1][k] = (u64)table_coeff[j+1][k] * mods[j] % mods[k];
-        }
-        table_coeffinv.resize( nmods );
-        for( size_t i=0 ; i<nmods ; ++i )
-            table_coeffinv[i] = invm( table_coeff[i][i], mods[i] );
-    }
-
     static u64  garner( const vector<u32> &x )  {
         size_t  nmods = NMODS;
         vector<u32>  table_const( nmods );
@@ -590,6 +436,10 @@ int main()
     ios_base::sync_with_stdio( false );
     cin.tie( nullptr );
 
-    FPSA  A, B, C;
+    FPSA  A;
+    FPSA  B( { 6, 6, 6 } );
+    FPSA  C( { 5, 5, 5 } );
+    cout << C + B << endl;
+
     return  0;
 }
