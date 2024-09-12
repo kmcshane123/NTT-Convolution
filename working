@@ -211,7 +211,7 @@ class FormalPowerSeries
         return  size() == 0 ? (*this) = FPS( { 0 } ) : (*this );
     }
 
-  private:
+  public:
     constexpr FPS  low( int s ) const  {
         return FPS( { a.begin(), a.begin() + min( max( s, 1 ), int( size() ) ) } );
     }
@@ -324,13 +324,33 @@ class FormalPowerSeriesArb : public FormalPowerSeries<T>
     constexpr FormalPowerSeriesArb()  { init(); }
     constexpr FormalPowerSeriesArb( const initializer_list<T>  v )  { FPSB::a = v; init(); }
 
-  public:
+    constexpr FPSA  operator * ( const FPSA &a ) const { return  FPSA(*this) *= a; }
+
+    FPSA  &operator *= ( const FPSA &r )  {
+        this->convolution_inplace( r );
+        return  *this;
+    }
+
+  private:
     static void  init()  {
         static bool  initialized = false;
         if( !initialized )  {
            setUpGarner();
            initialized = true;
         }
+    }
+
+    FPSA&  convolution_inplace( FPSA b )  {
+        if( this->size() == 0  ||  b.size() == 0 )  {
+            this->a.clear();  return  *this; }
+
+        size_t  n = this->size(),  m = b.size(),  sz = 1 << __lg( 2*(n+m-1) - 1 );
+        if( min( n, m ) <= 60 )  {
+            auto  K = FPSB::convolution_brute( *this, b );
+            (*this).a = K.a;
+            return  *this;
+        }
+        
     }
 
     static u64  powm( u64 a, u64 i, u64 m )  {
@@ -439,7 +459,7 @@ int main()
     FPSA  A;
     FPSA  B( { 6, 6, 6 } );
     FPSA  C( { 5, 5, 5 } );
-    cout << C + B << endl;
+    cout << C * B << endl;
 
     return  0;
 }
