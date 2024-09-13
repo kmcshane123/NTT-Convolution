@@ -303,7 +303,7 @@ class FormalPowerSeries
 template < typename T >
 class FormalPowerSeriesArb : public FormalPowerSeries<T>
 {
-  public:
+  private:
     using  i32 = int32_t;    using  i64 = int64_t;
     using  u32 = uint32_t;   using  u64 = uint64_t;
 
@@ -336,7 +336,7 @@ class FormalPowerSeriesArb : public FormalPowerSeries<T>
         u64  carry = 0;
         for( size_t i=0 ; i<p.size() ; ++i  )  {
             u64  cur = work[i] + carry;
-            p.a[i] = T( cur );
+            p[i] = T( cur );
             carry = cur/MOD;
         }
         if( carry )  p.a.push_back( T( carry ) );
@@ -432,7 +432,7 @@ class FormalPowerSeriesArb : public FormalPowerSeries<T>
 
         FPSB::a.resize( a1.size() ) ;
         for( size_t i=0 ; i<a1.size() ; ++i )
-            FPSB::a[i] = garner( { a1.a[i].get(), a2.a[i].get(), a3.a[i].get() } );
+            FPSB::a[i] = garner( { a1[i].get(), a2[i].get(), a3[i].get() } );
         return  *this;
     }
 };
