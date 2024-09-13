@@ -108,7 +108,7 @@ class FormalPowerSeries
     using  FPS   = FormalPowerSeries<T>;
 
     // CLASS DATA
-	vector<T>  a;
+    vector<T>  a;
 
   public:
     // CONSTRUCTORS
@@ -134,7 +134,7 @@ class FormalPowerSeries
         return  os;
     }
     friend istream& operator >> ( istream& is, FPS &p )  {
-	    for( auto &v : p.a )  { i64 w;  is >> w;  v = w; }   return  is;
+        for( auto &v : p.a )  { i64 w;  is >> w;  v = w; }   return  is;
     }
 
     // MATHEMATICAL OPERATORS
@@ -328,7 +328,7 @@ class FormalPowerSeriesArb : public FormalPowerSeries<T>
     // INPUT
     friend istream& operator >> ( istream& is, FPSA &p )  {
         vector<i64>  work( p.size() );
-	    for( auto &v : work )  { is >> v; }
+        for( auto &v : work )  { is >> v; }
         u64  carry = 0;
         for( size_t i=0 ; i<p.size() ; ++i  )  {
             u64  cur = work[i] + carry;
@@ -415,7 +415,7 @@ class FormalPowerSeriesArb : public FormalPowerSeries<T>
         for( size_t i=0 ; i<n ; ++i )  {
             u64  x = A[i].get();
             a3[i] = x %M3;  a2[i] = x %M2;  a1[i] = x %M1;
-	    }
+	}
         for( size_t i=0 ; i<m ; ++i )  {
             u64  x = B[i].get();
             b3[i] = x %M3;  b2[i] = x %M2;  b1[i] = x %M1;
@@ -423,9 +423,8 @@ class FormalPowerSeriesArb : public FormalPowerSeries<T>
         a3 *= b3;  a2 *= b2;  a1 *= b1;
 
         FPSB::a.resize( a1.size() ) ;
-        for( size_t i=0 ; i<a1.size() ; ++i )  {
+        for( size_t i=0 ; i<a1.size() ; ++i ) 
             FPSB::a[i] = garner( { a1.a[i].get(), a2.a[i].get(), a3.a[i].get() } );
-        }
         return  *this;
     }
 };
