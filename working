@@ -1,3 +1,5 @@
+// SOLVES CONVOLUTION MOD 1000000007
+// https://judge.yosupo.jp/problem/convolution_mod_1000000007
 
 #include <cstdint>
 #include <iostream>
@@ -104,7 +106,6 @@ class FormalPowerSeries
   public:
     using  i64   = int64_t;
     using  FPS   = FormalPowerSeries<T>;
-    using  VPoly = vector<FPS>;
 
     // CLASS DATA
 	vector<T>  a;
@@ -295,19 +296,22 @@ class FormalPowerSeries
     }
 };
 
-template < typename T, u32 nmods = 3 >
+template < typename T >
 class FormalPowerSeriesArb : public FormalPowerSeries<T>
 {
   public:
     using  i32 = int32_t;    using  i64 = int64_t;
     using  u32 = uint32_t;   using  u64 = uint64_t;
-    using  FPSA = FormalPowerSeriesArb<T, nmods>;
 
-    static constexpr u32  M1 = 1045430273, M2 = 1051721729, M3 = 1053818881;
-    static constexpr array<u32, 3>  mods{ M1, M2, M3 };
-    inline static vector<vector<u32>>  table_coeff;
-    inline static vector<u32>          table_coeffinv;
+    // CLASS DATA
+    static constexpr u32  M1 = 962592769, M2 = 975175681, M3 = 976224257,
+                          M4 = 985661441, M5 = 998244353;
+    static constexpr const array<u32, 5>  mods{ M1, M2, M3, M4, M5 };
+    inline static  vector<vector<u32>>    table_coeff;
+    inline static  vector<u32>            table_coeffinv;
+    inline static u32                     MOD;
 
+    using  FPSA = FormalPowerSeriesArb<T>;
     using  FPSB = FormalPowerSeries<T>;
     using  FPS1 = FormalPowerSeries< Mint<M1> >;
     using  FPS2 = FormalPowerSeries< Mint<M2> >;
@@ -321,7 +325,22 @@ class FormalPowerSeriesArb : public FormalPowerSeries<T>
     constexpr FormalPowerSeriesArb()  { init(); }
     constexpr FormalPowerSeriesArb( const initializer_list<T>  v )  { FPSB::a = v; init(); }
 
-    FPSA  operator * ( FPSA &A )  { return  (*this) *= A; }
+    // INPUT
+    friend istream& operator >> ( istream& is, FPSA &p )  {
+        vector<i64>  work( p.size() );
+	    for( auto &v : work )  { is >> v; }
+        u64  carry = 0;
+        for( size_t i=0 ; i<p.size() ; ++i  )  {
+            u64  cur = work[i] + carry;
+            p.a[i] = T( cur );
+            carry = cur/MOD;
+        }
+        if( carry )  p.a.push_back( T( carry ) );
+	    return  is;
+    }
+
+    // ARITHMETIC OPERATORS
+    constexpr FPSA  operator * ( const FPSA &a ) const { return  FPSA(*this) *= a; }
 
     FPSA  &operator *= ( const FPSA &r )  {
         FPSA::convolution_inplace( r );
@@ -333,6 +352,7 @@ class FormalPowerSeriesArb : public FormalPowerSeries<T>
         static bool  initialized = false;
         if( !initialized )  {
            setUpGarner();
+           MOD = T::get_mod();
            initialized = true;
         }
     }
@@ -342,7 +362,7 @@ class FormalPowerSeriesArb : public FormalPowerSeries<T>
             this->a.clear();  return  *this; }
 
         size_t  n = this->size(),  m = b.size();
-        if( min( n, m ) <=  25 )  {
+        if( min( n, m ) <= 60 )  {
             auto  G = FPSB::convolution_brute( (*this), b );
             (*this).a = G.a;
             return  (*this);
@@ -363,91 +383,68 @@ class FormalPowerSeriesArb : public FormalPowerSeries<T>
     void  resize( size_t sz, T m = 0 )  { (*this).a.resize( sz, m ); }
 
     static void setUpGarner()  {
-        table_coeff.assign( nmods + 1, vector<u32>( nmods, 1 ) );
-        for( size_t j=0 ; j<nmods ; ++j )  {
-            for( size_t k=0 ; k<nmods ; ++k )   table_coeff[j+1][k] = table_coeff[j][k];
-            for( size_t k=j+1 ; k<nmods ; ++k )
+        table_coeff.assign( 4, vector<u32>( 3, 1 ) );
+        for( size_t j=0 ; j<3 ; ++j )  {
+            for( size_t k=0 ; k<3 ; ++k )   table_coeff[j+1][k] = table_coeff[j][k];
+            for( size_t k=j+1 ; k<3 ; ++k )
                 table_coeff[j+1][k] = (u64)table_coeff[j+1][k] * mods[j] % mods[k];
         }
-        table_coeffinv.resize( nmods );
-        for( size_t i=0 ; i<nmods ; ++i )
+        table_coeffinv.resize( 3 );
+        for( size_t i=0 ; i<3 ; ++i )
             table_coeffinv[i] = invm( table_coeff[i][i], mods[i] );
     }
 
     static u64  garner( const vector<u32> &x )  {
-        vector<u32>  table_const( nmods );
+        vector<u32>  table_const( 3 );
         u64  res_coeff = 1;
         u64  res = 0;
-        for( size_t j=0 ; j<nmods ; ++j )  {
+        for( size_t j=0 ; j<3 ; ++j )  {
             u64  t = (u64)( x[j] + mods[j] - table_const[j] ) * table_coeffinv[j] % mods[j];
-            for( size_t k=j+1 ; k<nmods ; ++k )
+            for( size_t k=j+1 ; k<3 ; ++k )
                 table_const[k] = ( table_const[k] + (u64)table_coeff[j][k] * t ) % mods[k];
-            res = ( res + res_coeff * u64( t ) ) %T::get_mod();
-            res_coeff = res_coeff * mods[j] %T::get_mod();
+            res = ( res + res_coeff * u64( t ) ) %MOD;
+            res_coeff = res_coeff * mods[j] %MOD;
         }
         return  res;
     }
 
-    static FPSA  convolve( const FPSA &A, const FPSA &B )  {
+    FPSA  convolve( const FPSA &A, const FPSA &B )  {
         size_t  n = A.size(),  m = B.size();
-
-        FPS1  a1( n ),  b1( m );
-        FPS2  a2( n ),  b2( m );
-        FPS3  a3( n ),  b3( m );
+        FPS1  a1( n ), b1( m );  FPS2  a2( n ), b2( m );  FPS3  a3( n ), b3( m );
 
         for( size_t i=0 ; i<n ; ++i )  {
             u64  x = A[i].get();
-            switch( nmods )  {
-              case  3:  a3[i] = x %M3;
-              case  2:  a2[i] = x %M2;
-              case  1:  a1[i] = x %M1;
-            }
+            a3[i] = x %M3;  a2[i] = x %M2;  a1[i] = x %M1;
 	    }
         for( size_t i=0 ; i<m ; ++i )  {
             u64  x = B[i].get();
-            switch( nmods )  {
-
-              case  3:  b3[i] = x %M3;
-              case  2:  b2[i] = x %M2;
-              case  1:  b1[i] = x %M1;
-            }
+            b3[i] = x %M3;  b2[i] = x %M2;  b1[i] = x %M1;
         }
+        a3 *= b3;  a2 *= b2;  a1 *= b1;
 
-        switch( nmods )  {
-          case  3:  a3 *= b3;
-          case  2:  a2 *= b2;
-          case  1:  a1 *= b1;
+        FPSB::a.resize( a1.size() ) ;
+        for( size_t i=0 ; i<a1.size() ; ++i )  {
+            FPSB::a[i] = garner( { a1.a[i].get(), a2.a[i].get(), a3.a[i].get() } );
         }
-
-        FPSA  res( a1.size() );
-        for( size_t i=0 ; i<a1.size() ; ++i )
-        res.a[i] = garner( { a1.a[i].get(), a2.a[i].get(), a3.a[i].get() } );
-        return  res;
+        return  *this;
     }
 };
 
-u32  MOD = 1000000007;
-using  F = FormalPowerSeriesArb< Mint<1000000007>, 3 >;
+using  F = FormalPowerSeriesArb< Mint<1000000007> >;
 
 
-int main()  {
+int main()
+{
     ios_base::sync_with_stdio( false );
-    cin.tie( nullptr );
+    cin.tie( NULL );
 
-    size_t  n, m;
-    cin >> n >> m;
+    int N, M;
+    cin >> N >> M;
 
-    vector<u64>  a( n ),  b( m );
-    for( auto &x : a )  cin >> x;
-    for( auto &x : b )  cin >> x;
+    F  x( N ), y( M );
+    cin >> x >> y;
 
-    F  A( n ),  B( m );
-    for( int i=0 ;i<n ; ++i )  A[i] = a[i] %MOD;
-    for( int i=0 ;i<m ; ++i )  B[i] = b[i] %MOD;
-
-    auto  ans = A * B;
-
-    cout << ans << '\n';
+    cout << x * y << '\n';
 
     return  0;
 }
