@@ -5,6 +5,9 @@
 #include <cassert>
 using namespace std;
 
+using  u64 = uint64_t;
+using  u32 = uint32_t;
+
 template <uint32_t mod>  // MOD INT STORED IN MONTGOMERY FORM
 class  Mint
 {
@@ -99,10 +102,9 @@ class FormalPowerSeries
   public:
     using  i64   = int64_t;
     using  FPS   = FormalPowerSeries<T>;
-    using  VPoly = vector<FPS>;
 
     // CLASS DATA
-	vector<T>  a;
+    vector<T>  a;
 
   public:
     // CONSTRUCTORS
@@ -117,7 +119,7 @@ class FormalPowerSeries
         assert( x < this->a.size() );
         return  a[x];
     }
-    constexpr T  &operator [] ( size_t  x ) const {
+    constexpr T  operator [] ( size_t  x ) const {
         assert( x < this->a.size() );
         return  a[x];
     }
@@ -128,7 +130,7 @@ class FormalPowerSeries
         return  os;
     }
     friend istream& operator >> ( istream& is, FPS &p )  {
-	    for( auto &v : p.a )  { i64 w;  is >> w;  v = w; }   return  is;
+        for( auto &v : p.a )  { i64 w;  is >> w;  v = w; }   return  is;
     }
 
     // MATHEMATICAL OPERATORS
@@ -138,6 +140,10 @@ class FormalPowerSeries
     constexpr FPS  operator * ( const FPS &a ) const { return  FPS(*this) *= a; }
     constexpr FPS  operator / ( const FPS &a ) const { return  FPS(*this) /= a; }
     constexpr FPS  operator % ( const FPS &a ) const { return  FPS(*this) %= a; }
+    FPS  &operator = ( const FPS &r )  {
+        this->a = r.a;
+        return  *this;
+    }
     FPS  &operator += ( const FPS &r )  {
         this->resize( max( this->size(), r.size() ) );
         for( size_t i=0 ; i<r.size() ; ++i )  this->a[i] += r.a[i];
@@ -206,6 +212,18 @@ class FormalPowerSeries
         return  size() == 0 ? (*this) = FPS( { 0 } ) : (*this );
     }
 
+    FPS  convolution_brute(const FPS &a, const FPS &b ) const  {
+        size_t  n = a.size(),  m = b.size();
+        FPS  ans( n + m - 1 );
+        if( n < m )
+            for( size_t j=0 ; j<m ; ++j )
+                for( size_t i=0 ; i<n ; ++i )   ans[i+j] += a[i]*b[j];
+        else
+            for( size_t i=0 ; i<n ; ++i )
+                for( size_t j=0 ; j<m ; ++j )   ans[i+j] += a[i]*b[j];
+        return ans;
+    }
+
   private:
     constexpr FPS  low( int s ) const  {
         return FPS( { a.begin(), a.begin() + min( max( s, 1 ), int( size() ) ) } );
@@ -262,18 +280,6 @@ class FormalPowerSeries
         }
         auto  c = T( 1 ) / T( inverse ? n : 1 );
         for( auto&& e : this->a )  e *= c;
-    }
-
-    FPS  convolution_brute( FPS &a, FPS &b ) const  {
-        size_t  n = a.size(),  m = b.size();
-        FPS  ans( n + m - 1 );
-        if( n < m )
-            for( size_t j=0 ; j<m ; ++j )
-                for( size_t i=0 ; i<n ; ++i )   ans[i+j] += a[i]*b[j];
-        else
-            for( size_t i=0 ; i<n ; ++i )
-                for( size_t j=0 ; j<m ; ++j )   ans[i+j] += a[i]*b[j];
-        return ans;
     }
 
     FPS&  convolution_inplace( FPS b )  {
