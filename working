@@ -144,6 +144,10 @@ class FormalPowerSeries
     constexpr FPS  operator * ( const FPS &a ) const { return  FPS(*this) *= a; }
     constexpr FPS  operator / ( const FPS &a ) const { return  FPS(*this) /= a; }
     constexpr FPS  operator % ( const FPS &a ) const { return  FPS(*this) %= a; }
+    FPS  &operator = ( const FPS &r )  {
+        this->a = r.a;
+        return  *this;
+    }
     FPS  &operator += ( const FPS &r )  {
         this->resize( max( this->size(), r.size() ) );
         for( size_t i=0 ; i<r.size() ; ++i )  this->a[i] += r.a[i];
@@ -342,6 +346,10 @@ class FormalPowerSeriesArb : public FormalPowerSeries<T>
     // ARITHMETIC OPERATORS
     constexpr FPSA  operator * ( const FPSA &a ) const { return  FPSA(*this) *= a; }
 
+    FPSA  &operator = ( const FPSA &r )  {
+        this->a = r.a;
+        return  *this;
+    }
     FPSA  &operator *= ( const FPSA &r )  {
         FPSA::convolution_inplace( r );
         return  *this;
@@ -423,7 +431,7 @@ class FormalPowerSeriesArb : public FormalPowerSeries<T>
         a3 *= b3;  a2 *= b2;  a1 *= b1;
 
         FPSB::a.resize( a1.size() ) ;
-        for( size_t i=0 ; i<a1.size() ; ++i ) 
+        for( size_t i=0 ; i<a1.size() ; ++i )
             FPSB::a[i] = garner( { a1.a[i].get(), a2.a[i].get(), a3.a[i].get() } );
         return  *this;
     }
