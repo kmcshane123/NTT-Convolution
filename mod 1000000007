@@ -346,13 +346,18 @@ class FormalPowerSeriesArb : public FormalPowerSeries<T>
     // ARITHMETIC OPERATORS
     constexpr FPSA  operator * ( const FPSA &a ) const { return  FPSA(*this) *= a; }
 
-    FPSA  &operator = ( const FPSA &r )  {
-        this->a = r.a;
-        return  *this;
-    }
-    FPSA  &operator *= ( const FPSA &r )  {
-        FPSA::convolution_inplace( r );
-        return  *this;
+    FPSA  &operator *= ( const FPSA &b )  {
+        if( this->size() == 0  ||  b.size() == 0 )  {
+            this->a.clear();  return  *this; }
+
+        size_t  n = this->size(),  m = b.size();
+        if( min( n, m ) <= 60 )  {
+            auto  G = FPSB::convolution_brute( (*this), b );
+            (*this).a = G.a;
+            return  (*this);
+        }
+        convolve_inplace( b );
+        return  (*this);
     }
 
   private:
@@ -365,19 +370,6 @@ class FormalPowerSeriesArb : public FormalPowerSeries<T>
         }
     }
 
-    FPSA  convolution_inplace( const FPSA &b )  {
-        if( this->size() == 0  ||  b.size() == 0 )  {
-            this->a.clear();  return  *this; }
-
-        size_t  n = this->size(),  m = b.size();
-        if( min( n, m ) <= 60 )  {
-            auto  G = FPSB::convolution_brute( (*this), b );
-            (*this).a = G.a;
-            return  (*this);
-        }
-        return  convolve( (*this), b );
-    }
-
     static u64  powm( u64 a, u64 i, u64 m )  {
         u64  r = a,  res = 1;
         while( i )  {
@@ -386,8 +378,8 @@ class FormalPowerSeriesArb : public FormalPowerSeries<T>
         }
         return  res;
     }
-
     static u32  invm( u32 a, u32 m )  {	return  powm( a, m - 2, m ); }
+
     void  resize( size_t sz, T m = 0 )  { (*this).a.resize( sz, m ); }
 
     static void setUpGarner()  {
@@ -415,12 +407,12 @@ class FormalPowerSeriesArb : public FormalPowerSeries<T>
         return  res;
     }
 
-    FPSA  convolve( const FPSA &A, const FPSA &B )  {
-        size_t  n = A.size(),  m = B.size();
+    void  convolve_inplace( const FPSA &B )  {
+        size_t  n = (*this).size(),  m = B.size();
         FPS1  a1( n ), b1( m );  FPS2  a2( n ), b2( m );  FPS3  a3( n ), b3( m );
 
         for( size_t i=0 ; i<n ; ++i )  {
-            u64  x = A[i].get();
+            u64  x = (*this)[i].get();
             a3[i] = x %M3;  a2[i] = x %M2;  a1[i] = x %M1;
 	}
         for( size_t i=0 ; i<m ; ++i )  {
@@ -432,7 +424,7 @@ class FormalPowerSeriesArb : public FormalPowerSeries<T>
         FPSB::a.resize( a1.size() ) ;
         for( size_t i=0 ; i<a1.size() ; ++i )
             FPSB::a[i] = garner( { a1[i].get(), a2[i].get(), a3[i].get() } );
-        return  *this;
+        return;
     }
 };
 
