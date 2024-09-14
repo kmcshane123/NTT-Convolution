@@ -426,8 +426,6 @@ class FormalPowerSeriesArb : public FormalPowerSeries<T>
     }
 };
 
-using  F = FormalPowerSeriesArb< Mint<1000000007> >;
-
 
 int main()
 {
@@ -437,7 +435,7 @@ int main()
     int N, M;
     cin >> N >> M;
 
-    F  x( N ), y( M );
+    FormalPowerSeriesArb< Mint<1000000007> >  x( N ), y( M );
     cin >> x >> y;
 
     cout << x * y << '\n';
