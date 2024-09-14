@@ -311,8 +311,8 @@ class FormalPowerSeriesArb : public FormalPowerSeries<T>
     static constexpr u32  M1 = 962592769, M2 = 975175681, M3 = 976224257,
                           M4 = 985661441, M5 = 998244353;
     static constexpr const array<u32, 5>  mods{ M1, M2, M3, M4, M5 };
-    inline static  vector<vector<u32>>    table_coeff;
-    inline static  vector<u32>            table_coeffinv;
+    inline static  vector<vector<u32>>    garConst;
+    inline static  vector<u32>            garInv;
     inline static u32                     MOD;
 
     using  FPSA = FormalPowerSeriesArb<T>;
@@ -391,27 +391,26 @@ class FormalPowerSeriesArb : public FormalPowerSeries<T>
     void  resize( size_t sz, T m = 0 )  { (*this).a.resize( sz, m ); }
 
     static void setUpGarner()  {
-        table_coeff.assign( 4, vector<u32>( 3, 1 ) );
+        garConst.assign( 4, vector<u32>( 3, 1 ) );
         for( size_t j=0 ; j<3 ; ++j )  {
-            for( size_t k=0 ; k<3 ; ++k )   table_coeff[j+1][k] = table_coeff[j][k];
+            for( size_t k=0 ; k<3 ; ++k )   garConst[j+1][k] = garConst[j][k];
             for( size_t k=j+1 ; k<3 ; ++k )
-                table_coeff[j+1][k] = (u64)table_coeff[j+1][k] * mods[j] % mods[k];
+                garConst[j+1][k] = (u64)garConst[j+1][k] * mods[j] % mods[k];
         }
-        table_coeffinv.resize( 3 );
+        garInv.resize( 3 );
         for( size_t i=0 ; i<3 ; ++i )
-            table_coeffinv[i] = invm( table_coeff[i][i], mods[i] );
+            garInv[i] = invm( garConst[i][i], mods[i] );
     }
 
     static u64  garner( const vector<u32> &x )  {
-        vector<u32>  table_const( 3 );
-        u64  res_coeff = 1;
-        u64  res = 0;
+        vector<u32>  work( 3 );
+        u64  resMul = 1,  res = 0;
         for( size_t j=0 ; j<3 ; ++j )  {
-            u64  t = (u64)( x[j] + mods[j] - table_const[j] ) * table_coeffinv[j] % mods[j];
+            u64  t = (u64)( x[j] + mods[j] - work[j] ) * garInv[j] % mods[j];
             for( size_t k=j+1 ; k<3 ; ++k )
-                table_const[k] = ( table_const[k] + (u64)table_coeff[j][k] * t ) % mods[k];
-            res = ( res + res_coeff * u64( t ) ) %MOD;
-            res_coeff = res_coeff * mods[j] %MOD;
+                work[k] = ( work[k] + (u64)garConst[j][k] * t ) % mods[k];
+            res = ( res + resMul * u64( t ) ) %MOD;
+            resMul = resMul * mods[j] %MOD;
         }
         return  res;
     }
