@@ -104,8 +104,8 @@ template < typename T >
 class FormalPowerSeries
 {
   public:
-    using  i64   = int64_t;
-    using  FPS   = FormalPowerSeries<T>;
+    using  i64 = int64_t;
+    using  FPS = FormalPowerSeries<T>;
 
     // CLASS DATA
     vector<T>  a;
@@ -324,10 +324,10 @@ class FormalPowerSeriesArb : public FormalPowerSeries<T>
   public:
     // CONSTRUCTORS
     constexpr FormalPowerSeriesArb( size_t sz )  { FPSB::a.resize( sz, 0 );  init(); }
-    constexpr FormalPowerSeriesArb( const vector<T>  &v )  { FPSB::a = v;  init(); }
-    constexpr FormalPowerSeriesArb( size_t sz, T val )  { FPSB::a.resize( sz, val );  init(); }
+    constexpr FormalPowerSeriesArb( const vector<T> &v )  { FPSB::a = v;  init(); }
+    constexpr FormalPowerSeriesArb( size_t sz, T v )  { FPSB::a.resize( sz, v );  init(); }
     constexpr FormalPowerSeriesArb()  { init(); }
-    constexpr FormalPowerSeriesArb( const initializer_list<T>  v )  { FPSB::a = v; init(); }
+    constexpr FormalPowerSeriesArb( const initializer_list<T> v )  { FPSB::a = v; init(); }
 
     // INPUT
     friend istream& operator >> ( istream& is, FPSA &p )  {
@@ -344,7 +344,7 @@ class FormalPowerSeriesArb : public FormalPowerSeries<T>
     }
 
     // ARITHMETIC OPERATORS
-    constexpr FPSA  operator * ( const FPSA &a ) const { return  FPSA(*this) *= a; }
+    constexpr FPSA  operator * ( const FPSA &a )  { return  FPSA(*this) *= a; }
 
     FPSA  &operator *= ( const FPSA &b )  {
         if( this->size() == 0  ||  b.size() == 0 )  {
@@ -380,12 +380,10 @@ class FormalPowerSeriesArb : public FormalPowerSeries<T>
     }
     static u32  invm( u32 a, u32 m )  {	return  powm( a, m - 2, m ); }
 
-    void  resize( size_t sz, T m = 0 )  { (*this).a.resize( sz, m ); }
-
     static void setUpGarner()  {
         garConst.assign( 4, vector<u32>( 3, 1 ) );
         for( size_t j=0 ; j<3 ; ++j )  {
-            for( size_t k=0 ; k<3 ; ++k )   garConst[j+1][k] = garConst[j][k];
+            for( size_t k=0 ; k<3 ; ++k )  garConst[j+1][k] = garConst[j][k];
             for( size_t k=j+1 ; k<3 ; ++k )
                 garConst[j+1][k] = (u64)garConst[j+1][k] * mods[j] % mods[k];
         }
