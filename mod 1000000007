@@ -187,33 +187,23 @@ class FormalPowerSeries
         }
         return *this = ( (*this).rev().low( n ) * r.rev().inverse( n ) ).low( n ).rev();
     }
-    FPS  &operator %= ( const FPS &Q )  {
-        if( Q.size() > size() )  return *this;
-        if( Q.size() < 128 )  {
-            int  dQ = Q.size() - 1;
-            while( dQ  &&  Q[dQ] == 0 )  --dQ;
-            assert( Q[dQ] != 0 );
-            for( int i=size()-1 ; i>=dQ ; --i ) {
-                if( a[i] == 0 )  continue;
-                T  x = a[i] / Q[dQ];
-                a[i] = 0;
-                for( int j=1 ; j<=dQ ; ++j )
-                    a[i-j] -= x * Q[dQ - j];
-            }
-            shrink();
-            return  *this;
+
+    FPS  &operator %= ( const FPS &P )  {
+        if( P.size() > size() )  return *this;
+        auto [ _, r ] = divmod( P );
+        return  r;
+    }
+
+    pair<FPS, FPS>  divmod( const FPS &D )  {
+        if( D.size() > this->size() )  return { {},*this };
+        FPS  Q = (*this) / D,   R = Q * D;
+        int  n = D.size(),  j = -1;
+        for( int i=0 ; i<n-1 ; ++i )  {
+            R[i] = a[i] - R[i];
+            if( R[i] != 0 )  j = i;
         }
-        FPS  P = (*this) / Q;
-        P *= Q;
-        int  dR = -1;
-        for( int i=0 ; i<(int)Q.size()-1 ; ++i )  {
-            P.a[i] = a[i] - P[i];
-            if( P[i] != 0 )  dR = i;
-        }
-        a.resize( dR + 1 );
-        for( int i=0 ; i<=dR ; ++i )  a[i] = P[i];
-        shrink();
-        return  size() == 0 ? (*this) = FPS( { 0 } ) : (*this );
+        R.a.resize( j + 1 );
+        return  { Q, R };
     }
 
     FPS  inverse( int dgr = -1 ) const  {
