@@ -1,153 +1,27 @@
-// SOLVES CONVOLUTION MOD 1000000007
-// https://judge.yosupo.jp/problem/convolution_mod_1000000007
-
-#include <cstdint>
-#include <iostream>
-#include <vector>
-#include <algorithm>
-#include <array>
-#include <cassert>
-using namespace std;
-
-using  u64 = uint64_t;
-using  u32 = uint32_t;
-
-template <uint32_t mod>  // MOD INT STORED IN MONTGOMERY FORM
-class  Mint
-{
-  private:
-    using  i32 = int32_t;    using  i64 = int64_t;
-    using  u32 = uint32_t;   using  u64 = uint64_t;
-
-    static constexpr u32  get_r()  {
-        u32  ret = mod;
-        for( i32 i=0 ; i<4 ; ++i )  ret *= 2 - mod * ret;
-        return  ret;
-    }
-
-    static constexpr u32  reduce( const u64 &b )  {
-        return ( b + u64( u32( b ) * u32( -r ) ) * mod ) >> 32;
-    }
-
-    // CLASS MEMBER DATA
-    static constexpr u32  r  = get_r();
-    static constexpr u32  n2 = -u64( mod ) % mod;
-	u32                   a;
-
-    static_assert( r * mod == 1, "invalid, r * mod != 1" );
-    static_assert( mod < (1 << 30), "invalid, mod >= 2 ^ 30" );
-    static_assert( (mod & 1) == 1, "invalid, mod % 2 == 0" );
-
-  public:
-    // CONSTRUCTORS
-    constexpr Mint() : a( 0 ) {}
-    constexpr Mint( i64 b )
-        : a( reduce( u64( b % mod + mod ) * n2 ) ) {};
-
-    // ARITMETIC OPERATORS
-    constexpr Mint &operator += ( const Mint &b )  {
-        if( i32( a += b.a - 2 * mod ) < 0 )   a += 2 * mod;
-        return  *this;
-    }
-    constexpr Mint &operator -= ( const Mint &b )  {
-        if( i32( a -= b.a ) < 0 )   a += 2 * mod;
-        return  *this;
-    }
-    constexpr Mint &operator *= ( const Mint &b )  {
-        a = reduce( u64( a ) * b.a );
-        return  *this;
-    }
-    constexpr Mint &operator /= ( const Mint &b )  {
-        *this *= b.inverse();
-        return  *this;
-    }
-
-    constexpr Mint operator  + (const Mint &b) const { return Mint(*this) += b; }
-    constexpr Mint operator  - (const Mint &b) const { return Mint(*this) -= b; }
-    constexpr Mint operator  * (const Mint &b) const { return Mint(*this) *= b; }
-    constexpr Mint operator  / (const Mint &b) const { return Mint(*this) /= b; }
-    constexpr Mint operator - () const {  return  Mint() - Mint(*this); }
-    Mint& operator         ++ ()  { return  *this += Mint( 1 ); }
-    Mint& operator         -- ()  { return  *this -= Mint( 1 ); }
-
-    constexpr Mint  pow( u64 n ) const  {
-        Mint  ret(  1 ), mul( *this );
-        while( n > 0 )  { if( n & 1 )  ret *= mul;   mul *= mul;  n >>= 1; }
-        return  ret;
-    }
-    constexpr Mint  inverse() const { return  pow( mod - 2 ); }
-    constexpr u32  get() const  {
-        u32  ret = reduce( a );
-        return  ret >= mod ? ret - mod : ret;
-    }
-    static constexpr u32  get_mod()  { return mod; }
-
-    constexpr bool operator == (const Mint &b) const {
-        return ( a >= mod ? a - mod : a ) == ( b.a >= mod ? b.a - mod : b.a );
-    }
-    constexpr bool operator != (const Mint &b) const  {
-        return ( a >= mod ? a - mod : a ) != ( b.a >= mod ? b.a - mod : b.a );
-    }
-
-    // INPUT AND OUTPUT
-    friend ostream &operator << ( ostream &os, const Mint &b )  {
-        return  os << b.get();
-    }
-    friend istream &operator >> ( istream &is, Mint &b )  {
-        int64_t  t;  is >> t;
-        b = Mint( t );
-        return  is;
-    }
-};
-
-template < typename T >
+template < typename T, bool any = false >
 class FormalPowerSeries
 {
   public:
-    using  i64 = int64_t;
-    using  FPS = FormalPowerSeries<T>;
-
-    // CLASS DATA
-    vector<T>  a;
+    using  i64    = int64_t;
+    using  FPS   = FormalPowerSeries<T, any>;
+    using  VPoly = vector<FPS>;
+    
+	vector<T>  a;
 
   public:
-    // CONSTRUCTORS
-    constexpr FormalPowerSeries( size_t sz = 0 )  { a.resize( sz, 0 ); }
-    constexpr FormalPowerSeries( const initializer_list<T>  v )  { a = v; }
-    constexpr FormalPowerSeries( const vector<T>  &v )  { a = v; }
-    constexpr FormalPowerSeries( size_t sz, T val )  { a.resize( sz, val ); }
-    constexpr size_t  size() const { return a.size(); }
+    FormalPowerSeries( size_t sz = 0 )  { a.resize( sz, 0 ); }
+    FormalPowerSeries( const initializer_list<T>  v )  { a = v; }
+    FormalPowerSeries( const vector<T>  &v )  { a = v; }
+    FormalPowerSeries( size_t sz, T val )  { a.resize( sz, val ); }
+    size_t  size() const { return a.size(); }
     void  resize( size_t sz, T m = 0 )  { (*this).a.resize( sz, m ); }
 
-    T  &operator [] ( size_t  x )  {
-        assert( x < this->a.size() );
-        return  a[x];
-    }
-    constexpr T  operator [] ( size_t  x ) const {
-        assert( x < this->a.size() );
-        return  a[x];
-    }
-
-    // INPUT AND OUTPUT
-    friend std::ostream &operator << ( std::ostream &os, const FPS &p )  {
-        for( auto &v : p.a )   os << v << " ";
-        return  os;
-    }
-    friend istream& operator >> ( istream& is, FPS &p )  {
-        for( auto &v : p.a )  { i64 w;  is >> w;  v = w; }   return  is;
-    }
-
-    // MATHEMATICAL OPERATORS
-    constexpr FPS  operator - ( const FPS &a ) const { return  FPS(*this) -= a; }
-    constexpr FPS  operator + ( const FPS &a ) const { return  FPS(*this) += a; }
-    constexpr FPS  operator * ( const i64 a  ) const { return  FPS(*this) *= a; }
-    constexpr FPS  operator * ( const FPS &a ) const { return  FPS(*this) *= a; }
-    constexpr FPS  operator / ( const FPS &a ) const { return  FPS(*this) /= a; }
-    constexpr FPS  operator % ( const FPS &a ) const { return  FPS(*this) %= a; }
-    FPS  &operator = ( const FPS &r )  {
-        this->a = r.a;
-        return  *this;
-    }
+    FPS  operator - ( const FPS &a ) const { return  FPS(*this) -= a; }
+    FPS  operator + ( const FPS &a ) const { return  FPS(*this) += a; }
+    FPS  operator * ( const i64 a )  const { return  FPS(*this) *= a; }
+    FPS  operator * ( const FPS &a ) const { return  FPS(*this) *= a; }
+    FPS  operator / ( const FPS &a ) const { return  FPS(*this) /= a; }
+    FPS  operator % ( const FPS &a ) const { return  FPS(*this) %= a; }
     FPS  &operator += ( const FPS &r )  {
         this->resize( max( this->size(), r.size() ) );
         for( size_t i=0 ; i<r.size() ; ++i )  this->a[i] += r.a[i];
@@ -169,27 +43,11 @@ class FormalPowerSeries
     FPS  &operator /= ( const FPS &r )  {  // = Q OF POLY DIVISION
         if( size() < r.size() )   return *this = FPS( 0 );
         int  n = this->size() - r.size() + 1;
-        if( (int)r.size() <= 32 )  {
-            FPS  f( *this ),  g( r );
-            g.shrink();
-            int  coeff = g.a.back().inverse().get();
-            g *= coeff;
-            int  deg = (int)f.size() - (int)g.size() + 1;
-            int  gs  = g.size();
-            FPS  quo( deg );
-            for( int i=deg-1 ; i>=0 ; --i )  {
-                quo[i] = f[i+gs-1];
-                for( int j=0 ; j<gs ; ++j )  f[i+j] -= quo[i] * g[j];
-            }
-            *this = quo * coeff;
-            this->resize( n, 0 );
-            return *this;
-        }
         return *this = ( (*this).rev().low( n ) * r.rev().inverse( n ) ).low( n ).rev();
     }
     FPS  &operator %= ( const FPS &Q )  {
         if( Q.size() > size() )  return *this;
-        if( Q.size() < 128 )  {
+        if( Q.size() < 128 ) {
             int  dQ = Q.size() - 1;
             while( dQ  &&  Q[dQ] == 0 )  --dQ;
             assert( Q[dQ] != 0 );
@@ -215,44 +73,7 @@ class FormalPowerSeries
         shrink();
         return  size() == 0 ? (*this) = FPS( { 0 } ) : (*this );
     }
-
-    FPS  inverse( int dgr = -1 ) const  {
-        size_t  n = this->size();
-        assert( n != 0  &&  a[0] != 0 );
-        size_t  deg = ( dgr == -1 ) ? n : size_t( dgr );
-        FPS  r( { T( 1 ) / a[0] } );
-
-        for( size_t m=1 ; m<deg ; m*=2 )  {
-            size_t  twoM = m << 1;
-            FPS  f( { a.begin(), a.begin() + min( n, twoM ) } );
-            FPS  g( r );
-            f.resize( twoM ),  f.ntt( false );
-            g.resize( twoM ),  g.ntt( false );
-            for( size_t i=0 ; i<twoM ; ++i )  f[i] *= g[i];
-            f.ntt( true );
-            f.a.erase( f.a.begin(), f.a.begin() + m );
-            f.resize( twoM ),  f.ntt( false );
-            for( size_t i=0 ; i<twoM ; ++i )  f[i] *= g[i];
-            f.ntt( true );
-            for( size_t i=0 ; i<twoM ; ++i )  f[i] = -f[i];
-            r.a.insert( r.a.end(), f.a.begin(), f.a.begin() + m );
-        }
-        return  r.low( deg );
-    }
-    FPS  convolution_brute(const FPS &a, const FPS &b ) const  {
-        size_t  n = a.size(),  m = b.size();
-        FPS  ans( n + m - 1 );
-        if( n < m )
-            for( size_t j=0 ; j<m ; ++j )
-                for( size_t i=0 ; i<n ; ++i )   ans[i+j] += a[i]*b[j];
-        else
-            for( size_t i=0 ; i<n ; ++i )
-                for( size_t j=0 ; j<m ; ++j )   ans[i+j] += a[i]*b[j];
-        return ans;
-    }
-
-  private:
-    constexpr FPS  low( int s ) const  {
+    FPS  low( int s ) const  {
         return FPS( { a.begin(), a.begin() + min( max( s, 1 ), int( size() ) ) } );
     }
     void shrink()  { while( a.size()  &&  a.back() == 0 )  a.pop_back(); }
@@ -261,13 +82,29 @@ class FormalPowerSeries
         reverse( ret.a.begin(), ret.a.end() );
         return ret;
     }
-    constexpr FPS  shift( int x )  {
+    FPS  shift( int x )  { 
         FPS  ret = *this;
         if( x >= 0 )   ret.a.insert( begin( ret.a ), x, 0 );
         else  ret.a.erase( begin( ret.a ), begin( ret.a ) - x );
-        return  ret;
+        return  ret; 
+    }
+    T  &operator [] ( size_t  x )  {
+        assert( x < this->a.size() );
+        return  a[x];
+    }
+    const T  &operator [] ( size_t  x ) const {
+        assert( x < this->a.size() );
+        return  a[x];
+    }
+    friend std::ostream &operator << ( std::ostream &os, const FPS &p )  {
+        for( auto &v : p.a )   os << v << " ";
+        return  os;
+    }
+    friend istream& operator >> ( istream& is, FPS &p )  {
+	    for( auto &v : p.a )  { i64 w;  is >> w;  v = w; }   return  is;
     }
 
+  private:    
     void ntt( bool inverse )  {
         static bool  first = true;
         static T  dw[30], idw[30];
@@ -276,7 +113,7 @@ class FormalPowerSeries
             T  root = 2;
             unsigned  mod = T::get_mod();
             while( root.pow( (mod - 1) / 2) == 1 )   ++root;
-            for( size_t i=0 ; i<30 ; ++i )
+            for( size_t i=0 ; i<30 ; ++i ) 
                 dw[i]  = -root.pow( (mod - 1) >> (i + 2) ),
                 idw[i] = T(1) / dw[i];
         }
@@ -308,10 +145,23 @@ class FormalPowerSeries
         auto  c = T( 1 ) / T( inverse ? n : 1 );
         for( auto&& e : this->a )  e *= c;
     }
+    
+    FPS  convolution_brute( FPS &a, FPS &b ) const  {
+        size_t  n = a.size(),  m = b.size();
+        FPS  ans( n + m - 1 );
+        if( n < m )
+            for( size_t j=0 ; j<m ; ++j )
+                for( size_t i=0 ; i<n ; ++i )   ans[i+j] += a[i]*b[j];
+        else 
+            for( size_t i=0 ; i<n ; ++i )
+                for( size_t j=0 ; j<m ; ++j )   ans[i+j] += a[i]*b[j];
+        return ans;
+    }
 
     FPS&  convolution_inplace( FPS b )  {
         if( this->size() == 0  ||  b.size() == 0 )  {
             this->a.clear();  return  *this; }
+
 
         size_t  n = this->size(),  m = b.size(),  sz = 1 << __lg( 2*(n+m-1) - 1 );
         if( min( n, m ) <= 60 )   return  *this = convolution_brute( *this, b );
@@ -321,147 +171,323 @@ class FormalPowerSeries
         ntt( true );  resize( n + m - 1 );
         return  *this;
     }
-};
 
-template < typename T >
-class FormalPowerSeriesArb : public FormalPowerSeries<T>
-{
-  private:
-    using  i32 = int32_t;    using  i64 = int64_t;
-    using  u32 = uint32_t;   using  u64 = uint64_t;
-
-    // CLASS DATA
-    static constexpr u32  M1 = 962592769, M2 = 975175681, M3 = 976224257,
-                          M4 = 985661441, M5 = 998244353;
-    static constexpr const array<u32, 5>  mods{ M1, M2, M3, M4, M5 };
-    inline static  vector<vector<u32>>    garConst;
-    inline static  vector<u32>            garInv;
-    inline static u32                     MOD;
-
-    using  FPSA = FormalPowerSeriesArb<T>;
-    using  FPSB = FormalPowerSeries<T>;
-    using  FPS1 = FormalPowerSeries< Mint<M1> >;
-    using  FPS2 = FormalPowerSeries< Mint<M2> >;
-    using  FPS3 = FormalPowerSeries< Mint<M3> >;
 
   public:
-    // CONSTRUCTORS
-    constexpr FormalPowerSeriesArb( size_t sz )  { FPSB::a.resize( sz, 0 );  init(); }
-    constexpr FormalPowerSeriesArb( const vector<T> &v )  { FPSB::a = v;  init(); }
-    constexpr FormalPowerSeriesArb( size_t sz, T v )  { FPSB::a.resize( sz, v );  init(); }
-    constexpr FormalPowerSeriesArb()  { init(); }
-    constexpr FormalPowerSeriesArb( const initializer_list<T> v )  { FPSB::a = v; init(); }
+  // f(x)^-1 
+    FPS  inverse( int dgr = -1 ) const  {
+        size_t  n = this->size();
+        assert( n != 0  &&  a[0] != 0 );
+        size_t  deg = ( dgr == -1 ) ? n : size_t( dgr );
+        FPS  r( { T( 1 ) / a[0] } );
 
-    // INPUT
-    friend istream& operator >> ( istream& is, FPSA &p )  {
-        vector<i64>  work( p.size() );
-        for( auto &v : work )  { is >> v; }
-        u64  carry = 0;
-        for( size_t i=0 ; i<p.size() ; ++i  )  {
-            u64  cur = work[i] + carry;
-            p[i] = T( cur );
-            carry = cur/MOD;
+        for( size_t m=1 ; m<deg ; m*=2 )  {
+            size_t  twoM = m << 1;
+            FPS  f( { a.begin(), a.begin() + min( n, twoM ) } );
+            FPS  g( r );
+            f.resize( twoM ),  f.ntt( false );
+            g.resize( twoM ),  g.ntt( false );
+            for( size_t i=0 ; i<twoM ; ++i )  f[i] *= g[i];
+            f.ntt( true );
+            f.a.erase( f.a.begin(), f.a.begin() + m );
+            f.resize( twoM ),  f.ntt( false );
+            for( size_t i=0 ; i<twoM ; ++i )  f[i] *= g[i];
+            f.ntt( true ); 
+            for( size_t i=0 ; i<twoM ; ++i )  f[i] = -f[i];
+            r.a.insert( r.a.end(), f.a.begin(), f.a.begin() + m );
         }
-        if( carry )  p.a.push_back( T( carry ) );
-	    return  is;
+        return  r.low( deg );
     }
 
-    // ARITHMETIC OPERATORS
-    constexpr FPSA  operator * ( const FPSA &a )  { return  FPSA(*this) *= a; }
+  // f'(x)
+    FPS&  differential_inplace()  {
+        const size_t  n = this->a.size();
+        assert( n > 0 );
+        for( size_t i=1 ; i<n ; ++i )   a[i-1] = a[i] * i;
+        a[n-1] = 0;
+        return  *this;
+    }
+    FPS  differential() const { return  FPS( *this ).differential_inplace(); }
 
-    FPSA  &operator *= ( const FPSA &b )  {
-        if( this->size() == 0  ||  b.size() == 0 )  {
-            this->a.clear();  return  *this; }
+  // integral f(x)dx
+    FPS&  integral_inplace() {
+        const size_t  n = this->a.size();
+        assert( n > 0 );
+        this->a.insert( this->a.begin(), 0 );
+        vector<T>  inv( n + 1 );   inv[1] = 1;
+        unsigned  mod = T::get_mod();
+        for( size_t i=2 ; i<=n ; ++i )  inv[i] = -inv[mod %i]*( mod/i );
+        for( size_t i=2 ; i<=n ; ++i )  this->a[i] *= inv[i];
+        return  *this;
+    }
+    FPS  integral() const { return FPS( *this ).integ_inplace(); }
 
-        size_t  n = this->size(),  m = b.size();
-        if( min( n, m ) <= 60 )  {
-            auto  G = FPSB::convolution_brute( (*this), b );
-            (*this).a = G.a;
-            return  (*this);
+  // exp(f(x)) 
+    FPS&  exp_inplace( int deg = -1 )  {
+        size_t  n = this->size();
+        assert( n > 0  &&  a[0] == 0 );
+        if( deg == -1 )  deg = int( n );
+        FPS  g( { 1 } ),  g_fft;
+        this->resize( deg );
+        this->a[0] = 1;
+        FPS  h_drv = this->differential();
+        for( size_t m=1 ; m<deg ; m*=2 )  {
+            FPS  f_fft( { a.begin(), a.begin() + m } );
+            f_fft.resize( 2*m ), f_fft.ntt( false );
+            T  invm = T( 1 ) / m;
+
+            if( m > 1 )  {
+                FPS  _f( m );
+                for( size_t i=0 ; i<m ; ++i )  _f[i] = f_fft[i] * g_fft[i];
+                _f.ntt( true );
+                _f.a.erase( _f.a.begin(), _f.a.begin() + m/2 );
+                _f.resize( m ),  _f.ntt( false );
+                for( size_t i=0 ; i<m ; ++i )  _f[i] *= g_fft[i];
+                _f.ntt( true );
+                _f.resize( m/2 );
+                for( size_t i=0 ; i<m/2 ; ++i )  _f[i] = -_f[i];
+                g.a.insert( g.a.end(), _f.a.begin(), _f.a.begin() + m/2 );
+            }
+
+            FPS  t( { a.begin(), a.begin() + m } ); 
+            t.differential_inplace();
+            {
+                FPS  r( { h_drv.a.begin(), h_drv.a.begin() + m - 1 } );
+                r.resize( m );  r.ntt( false );
+                for( size_t i=0 ; i<m ; ++i )  r[i] *= f_fft[i];
+                r.ntt( true );
+                t -= r;
+                t.a.insert( t.a.begin(), t.a.back() );  t.a.pop_back();
+            }
+
+            t.resize( 2*m );  t.ntt( false ); 
+            g_fft = g;  g_fft.resize( 2*m );  g_fft.ntt( false );
+            for( size_t i=0 ; i<2*m ; ++i )  t[i] *= g_fft[i];
+            t.ntt( true );
+            t.resize( m );
+            
+            FPS  v( { a.begin() + m, a.begin() + min( deg, int( 2*m ) ) } );
+            v.resize( m );
+            t.a.insert( t.a.begin(), m-1, 0 );  t.a.push_back( 0 );
+            
+            t.integral_inplace();
+            
+            for( size_t i=0 ; i<m ; ++i )    v[i] -= t[m+i];
+            v.resize( 2*m );  v.ntt( false );
+            for( size_t i=0 ; i<2*m ; ++i )  v[i] *= f_fft[i];
+            v.ntt( true );
+            v.resize( m );
+
+            for( size_t i=0 ; i<min( deg-m, m ) ; ++i )  a[m+i] = v[i];
         }
-        convolve_inplace( b );
-        return  (*this);
+        return  *this;
+    }   
+    FPS  exp( const int deg = -1 ) const { return  FPS( *this ).exp_inplace( deg ); }
+
+  // log(f(x)) 
+    FPS&  log_inplace( int deg = -1 )  {
+        size_t  n = this->size();
+        assert( n > 0  &&  this->a[0] == 1 );
+        if( deg == -1 )  deg = n;
+        if( deg < n )    this->resize( deg );
+        FPS  f_inv = this->inverse();
+        this->differential_inplace();
+        *this *= f_inv;
+        this->resize( deg );
+        this->integral_inplace();
+        this->resize( deg );
+        return  *this;
+    }  
+    FPS  log( const int deg = -1 ) const { return FPS( *this ).log_inplace( deg ); }
+
+  // f(x)^k
+    FPS&  pow_inplace( i64 k, int dgr = -1 )  {
+        assert( dgr >= -1 );
+        size_t  n = size();
+        size_t  deg = ( dgr == -1 ) ? n : size_t( dgr );
+        size_t  l = 0;
+        while( this->a[l] == 0 )   ++l;
+        if( k*l > deg )   return  *this = FPS( deg );
+        T  ic = a[l].inverse();
+        T  pc = a[l].pow( k );
+        a.erase( a.begin(), a.begin() + l );
+        *this *= ic.get();
+        this->log_inplace();
+        *this *= k;
+        this->exp_inplace();
+        *this *= pc.get();
+        this->a.insert( this->a.begin(), l*k, 0 );
+        this->resize( deg );
+        return  *this;
+    }
+    FPS  pow( i64 k, int deg = -1 ) const { return FPS(*this).pow_inplace( k, deg ); }
+
+  // f(g(x))
+    FPS&  composition_inplace( const FPS &P )  {
+        size_t  n = P.size();
+        assert( n == size() );
+        size_t  k = 1;
+        while( uint64_t( k )*k < n )   ++k;
+
+        VPoly  pow1( k + 1 );
+        pow1[0] = { 1 };    pow1[1] = P;
+        for( size_t i=2 ; i<=k ; ++i )  {
+            pow1[i] = pow1[i-1] * pow1[1];
+            pow1[i].resize( n );
+        }
+        VPoly  pow2( k + 1 );
+        pow2[0] = { 1 };    pow2[1] = pow1[k];
+        for( size_t i=2 ; i<=k ; ++i )  {
+            pow2[i] = pow2[i-1] * pow2[1];
+            pow2[i].resize( n );
+        }
+        FPS  ans( n );
+        for( size_t i=0 ; i<=k ; ++i )  {
+            FPS  f( n );
+            for( size_t j=0 ; j<k ; ++j )  {
+                if( k*i + j < n )  {
+                    T coef = a[k*i + j];
+                    for( size_t d=0 ; d<pow1[j].size() ; ++d )
+                        f[d] += pow1[j][d]*coef;
+                }
+            } 
+            f *= pow2[i];
+            f.resize( n );
+            for( size_t j=0 ; j<n ; ++j )  ans[j] += f[j];
+        }
+        a = ans.a;
+        return  *this;
+    }
+    FPS  composition( const FPS &P ) { return FPS(*this).composition_inplace( P ); }
+
+  // f(x)/g(x)  QUOTIENT USING / THEN CALC REMAINDER   
+    pair<FPS, FPS>  divmod( const FPS &D )  {
+        if( D.size() > this->size() )  return { {},*this };
+        FPS  Q = (*this) / D;
+        FPS  R = Q * D;
+        int  n = D.size(),  j = -1;
+        for( int i=0 ; i<n-1 ; ++i )  {
+            R[i] = a[i] - R[i];
+            if( R[i] != 0 )  j = i;
+        }
+        R.a.resize( j + 1 );
+        return  { Q, R };
+    }
+    
+  private:   // FOR MULTIPOINT EVALUATION AND POLYNOMIAL INTERPOLATION
+    // BUILDS SEGMENT TREE  T  FOR  prod( x - pts[i] 
+	// REF:  https://cp-algorithms.com/algebra/polynomial.html
+    void  subprodTree( VPoly &tree, size_t rt, size_t l, size_t r )  
+    {
+        if( l + 1 == r )  {
+            tree[rt] = { (*this)[l] == 0 ? 0 : -(*this)[l], 1 };
+            return;
+        }
+
+        size_t  lKid = 2*rt,  rKid = lKid + 1,  mid  = ( l + r ) >> 1;
+        subprodTree( tree, lKid, l, mid );
+        subprodTree( tree, rKid, mid, r );
+        tree[rt] = tree[lKid] * tree[rKid];
     }
 
-  private:
-    static void  init()  {
-        static bool  initialized = false;
-        if( !initialized )  {
-           setUpGarner();
-           MOD = T::get_mod();
-           initialized = true;
-        }
+    // QUERIES SEGMENT TREE tree TO EVALUATE p AT VALS IN pts.
+    // STORES ANSWERS IN pts.
+    void  multiPtEvaluation( const VPoly &tree, size_t rt, size_t l,
+                             size_t r, FPS &p )  {
+        if( l + 1 == r )  { (*this)[l] = p.size() == 0 ? 0 : p[0];  return; }
+
+        size_t  lKid = 2*rt,  rKid = lKid + 1,  mid  = ( l + r ) >> 1;
+
+        FPS  A = p % tree[lKid];
+        multiPtEvaluation( tree, lKid, l, mid, A );
+        A = p % tree[rKid];
+        multiPtEvaluation( tree, rKid, mid, r, A );
     }
 
-    static u64  powm( u64 a, u64 i, u64 m )  {
-        u64  r = a,  res = 1;
-        while( i )  {
-            if( i & 1 )   res = res * r % m;
-            r = r * r % m;   i >>= 1;
-        }
-        return  res;
+    FPS  interp( const VPoly &tree, size_t rt, size_t l, size_t r )
+    {
+        if( l + 1 == r )   return { (*this)[l] };
+
+        size_t  lKid = 2*rt,   rKid = lKid + 1,   m = ( l + r ) >> 1;
+        
+        return  tree[rKid] * interp( tree, lKid, l, m ) +
+                tree[lKid] * interp( tree, rKid, m, r );
     }
-    static u32  invm( u32 a, u32 m )  {	return  powm( a, m - 2, m ); }
+    
+  public:
+    // OVERWRITES pts WITH p EVALUATED AT pts
+    FPS  multiPtEvaluation_IP( FPS& pts )
+    {
+        size_t  nSave = pts.size();
+        if( size() == 0 )   return  FPS( nSave );
+        pts.resize( max( size(), pts.size() ) );
+        size_t  n = pts.size();
+    
+        // BUILD SEGMENT TREE FOR PRODUCTS
+        VPoly  tree( n*4, FPS() );
+        pts.subprodTree( tree, 1, 0, n );
 
-    static void setUpGarner()  {
-        garConst.assign( 4, vector<u32>( 3, 1 ) );
-        for( size_t j=0 ; j<3 ; ++j )  {
-            for( size_t k=0 ; k<3 ; ++k )  garConst[j+1][k] = garConst[j][k];
-            for( size_t k=j+1 ; k<3 ; ++k )
-                garConst[j+1][k] = (u64)garConst[j+1][k] * mods[j] % mods[k];
-        }
-        garInv.resize( 3 );
-        for( size_t i=0 ; i<3 ; ++i )
-            garInv[i] = invm( garConst[i][i], mods[i] );
+        // QUERY SEGMENT TREE tree TO EVALUATE p AT pts
+        pts.multiPtEvaluation( tree, 1, 0, n, (*this) );
+        pts.resize( nSave );
+        return  pts;
+    }
+    FPS  multiPtEvaluation( FPS &b ) {  FPS  tmp( b );
+        return  (*this).multiPtEvaluation_IP( tmp ); }
+
+    // GIVEN  n  ORDERED PAIRS ( a[i], b[i] ),  FIT A DEGREE n-1
+    // POLYNOMIAL  f  SO THAT  f( a[i] ) %MOD = b[i]  FOR ALL i.
+    FPS  interpolate_IP( const FPS &b )
+    {
+        size_t  n = b.size();
+        assert( n == size() );
+
+        VPoly  tree( 4*n, FPS() );
+        (*this).subprodTree( tree, 1, 0, n );
+        
+        FPS  d = tree[1].differential();
+        (*this).multiPtEvaluation( tree, 1, 0, n, d );
+
+        for( size_t i=0 ; i<size() ; ++i )   (*this)[i] = b[i] / (*this)[i];
+		  
+        (*this) = (*this).interp( tree, 1, 0, n );
+        
+        (*this).resize( n );
+        return  *this;
+    }
+    FPS  interpolate( const FPS &b ) { return  FPS( *this ).interpolate_IP( b ); }
+    
+  private:  // FOR k-th TERM OF LINEAR RECURRENCE - BOSTAN-MORI ALGORITHM
+    friend void  half( FPS &A, bool odd )  {
+        for( size_t i=odd ; i<A.size() ; i+=2 )   A[i >> 1] = A[i];
+        A.resize( ( A.size() + !odd ) / 2 );
     }
 
-    static u64  garner( const vector<u32> &x )  {
-        vector<u32>  work( 3 );
-        u64  resMul = 1,  res = 0;
-        for( size_t j=0 ; j<3 ; ++j )  {
-            u64  t = (u64)( x[j] + mods[j] - work[j] ) * garInv[j] % mods[j];
-            for( size_t k=j+1 ; k<3 ; ++k )
-                work[k] = ( work[k] + (u64)garConst[j][k] * t ) % mods[k];
-            res = ( res + resMul * u64( t ) ) %MOD;
-            resMul = resMul * mods[j] %MOD;
+    friend T  fps_kth_term( FPS &p, FPS &q, i64 k )  {
+    	const size_t  sz = q.size();
+        FPS  qneg;
+        while( k > 0 )  {
+        	qneg = q;
+            for( size_t i=1 ; i<sz ; i+=2 )  qneg[i] = -qneg[i];
+            p *= qneg;         q *= qneg;
+            half( p,  k % 2 );  half( q, false );
+            k >>= 1;
         }
-        return  res;
+        return  p[0] / q[0];
     }
 
-    void  convolve_inplace( const FPSA &B )  {
-        size_t  n = (*this).size(),  m = B.size();
-        FPS1  a1( n ), b1( m );  FPS2  a2( n ), b2( m );  FPS3  a3( n ), b3( m );
-
-        for( size_t i=0 ; i<n ; ++i )  {
-            u64  x = (*this)[i].get();
-            a3[i] = x %M3;  a2[i] = x %M2;  a1[i] = x %M1;
-	}
-        for( size_t i=0 ; i<m ; ++i )  {
-            u64  x = B[i].get();
-            b3[i] = x %M3;  b2[i] = x %M2;  b1[i] = x %M1;
-        }
-        a3 *= b3;  a2 *= b2;  a1 *= b1;
-
-        FPSB::a.resize( a1.size() ) ;
-        for( size_t i=0 ; i<a1.size() ; ++i )
-            FPSB::a[i] = garner( { a1[i].get(), a2[i].get(), a3[i].get() } );
-        return;
+  public:
+      //  C = ( C[0], ..., C[m-1] )
+      //  V = ( V[0], ..., V[m-1] )
+	  //  RECURRENCE IS:
+      //    V[i] = C[0]*V[i-1] + C[1]*V[i-2] + ... + C[m-1]*V[i-m]
+    friend T  kth_term( const FPS &C, const FPS &V, i64 k )  {
+    	const size_t  sz = C.size();
+        FPS  q( sz + 1 );
+        q[0] = 1;
+        for( size_t i=0 ; i<sz ; ++i )   q[i + 1] = -C[i];
+        FPS  p = V * q;
+        p.resize( sz );
+        return  fps_kth_term( p, q, k );
     }
 };
-
-
-int main()
-{
-    ios_base::sync_with_stdio( false );
-    cin.tie( NULL );
-
-    int N, M;
-    cin >> N >> M;
-
-    FormalPowerSeriesArb< Mint<1000000007> >  x( N ), y( M );
-    cin >> x >> y;
-
-    cout << y * x << '\n';
-
-    return  0;
-}
