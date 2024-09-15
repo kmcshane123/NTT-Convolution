@@ -115,17 +115,12 @@ class FormalPowerSeries
     constexpr size_t  size() const { return a.size(); }
     void  resize( size_t sz, T m = 0 )  { (*this).a.resize( sz, m ); }
 
-    T  &operator [] ( size_t  x )  {
-        assert( x < this->a.size() );
-        return  a[x];
-    }
-    constexpr T  operator [] ( size_t  x ) const {
-        assert( x < this->a.size() );
-        return  a[x];
-    }
+    T &operator [] ( size_t  x ) { assert( x < this->a.size() );  return  a[x]; }
+    constexpr T operator [] ( size_t  x ) const { assert( x < this->a.size() );  return  a[x]; }
 
     // INPUT AND OUTPUT
     friend std::ostream &operator << ( std::ostream &os, const FPS &p )  {
+        if( p.size()== 0 )  { os << "0";  return  os; }
         for( auto &v : p.a )   os << v << " ";
         return  os;
     }
@@ -140,10 +135,8 @@ class FormalPowerSeries
     constexpr FPS  operator * ( const FPS &a ) const { return  FPS(*this) *= a; }
     constexpr FPS  operator / ( const FPS &a ) const { return  FPS(*this) /= a; }
     constexpr FPS  operator % ( const FPS &a ) const { return  FPS(*this) %= a; }
-    FPS  &operator = ( const FPS &r )  {
-        this->a = r.a;
-        return  *this;
-    }
+
+    FPS  &operator  = ( const FPS &r )  { this->a = r.a;  return  *this; }
     FPS  &operator += ( const FPS &r )  {
         this->resize( max( this->size(), r.size() ) );
         for( size_t i=0 ; i<r.size() ; ++i )  this->a[i] += r.a[i];
@@ -186,8 +179,8 @@ class FormalPowerSeries
 
     FPS  &operator %= ( const FPS &P )  {
         if( P.size() > size() )  return *this;
-        auto [ _, r ] = divmod( P );
-        return  r;
+        auto [ _, r ] = (*this).divmod( P );
+        return  (*this) = r;
     }
 
     pair<FPS, FPS>  divmod( const FPS &D )  {
