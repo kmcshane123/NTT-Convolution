@@ -172,7 +172,7 @@ class FormalPowerSeries
         if( (int)r.size() <= 32 )  {
             FPS  f( *this ),  g( r );
             g.shrink();
-            int  coeff = g.a.back().inv().v;
+            int  coeff = g.a.back().inverse().get();
             g *= coeff;
             int  deg = (int)f.size() - (int)g.size() + 1;
             int  gs  = g.size();
@@ -206,7 +206,7 @@ class FormalPowerSeries
         FPS  P = (*this) / Q;
         P *= Q;
         int  dR = -1;
-        for( int i=0 ; i<Q.size()-1 ; ++i )  {
+        for( int i=0 ; i<(int)Q.size()-1 ; ++i )  {
             P.a[i] = a[i] - P[i];
             if( P[i] != 0 )  dR = i;
         }
@@ -214,6 +214,30 @@ class FormalPowerSeries
         for( int i=0 ; i<=dR ; ++i )  a[i] = P[i];
         shrink();
         return  size() == 0 ? (*this) = FPS( { 0 } ) : (*this );
+    }
+
+    FPS  inverse( int dgr = -1 ) const  {
+        size_t  n = this->size();
+        assert( n != 0  &&  a[0] != 0 );
+        size_t  deg = ( dgr == -1 ) ? n : size_t( dgr );
+        FPS  r( { T( 1 ) / a[0] } );
+
+        for( size_t m=1 ; m<deg ; m*=2 )  {
+            size_t  twoM = m << 1;
+            FPS  f( { a.begin(), a.begin() + min( n, twoM ) } );
+            FPS  g( r );
+            f.resize( twoM ),  f.ntt( false );
+            g.resize( twoM ),  g.ntt( false );
+            for( size_t i=0 ; i<twoM ; ++i )  f[i] *= g[i];
+            f.ntt( true );
+            f.a.erase( f.a.begin(), f.a.begin() + m );
+            f.resize( twoM ),  f.ntt( false );
+            for( size_t i=0 ; i<twoM ; ++i )  f[i] *= g[i];
+            f.ntt( true );
+            for( size_t i=0 ; i<twoM ; ++i )  f[i] = -f[i];
+            r.a.insert( r.a.end(), f.a.begin(), f.a.begin() + m );
+        }
+        return  r.low( deg );
     }
 
     FPS  convolution_brute(const FPS &a, const FPS &b ) const  {
@@ -411,11 +435,11 @@ class FormalPowerSeriesArb : public FormalPowerSeries<T>
 
         for( size_t i=0 ; i<n ; ++i )  {
             u64  x = (*this)[i].get();
-            a3[i] = x %M3;  a2[i] = x %M2;  a1[i] = x %M1;
-	}
+            a3[i] = Mint<M3>( x );  a2[i] = Mint<M2>( x );  a1[i] = Mint<M1>( x );
+        }
         for( size_t i=0 ; i<m ; ++i )  {
             u64  x = B[i].get();
-            b3[i] = x %M3;  b2[i] = x %M2;  b1[i] = x %M1;
+            b3[i] = Mint<M3>( x );  b2[i] = Mint<M2>( x );  b1[i] = Mint<M1>( x );
         }
         a3 *= b3;  a2 *= b2;  a1 *= b1;
 
@@ -435,10 +459,14 @@ int main()
     int N, M;
     cin >> N >> M;
 
-    FormalPowerSeriesArb< Mint<1000000007> >  x( N ), y( M );
+    FormalPowerSeriesArb< Mint<1000000007> >  x( N ),  y( M );
     cin >> x >> y;
 
     cout << x * y << '\n';
+
+//    auto  a1 = y / x;
+//    auto  a2 = y % x;
+//    cout << a1 * x + a2 << '\n';
 
     return  0;
 }
