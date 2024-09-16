@@ -425,11 +425,11 @@ class FormalPowerSeriesArb : public FormalPowerSeries<T>
 
         for( size_t i=0 ; i<n ; ++i )  {
             u64  x = (*this)[i].get();
-            a3[i] = Mint<M3>( x );  a2[i] = Mint<M2>( x );  a1[i] = Mint<M1>( x );
+            a3[i] = x %M3;  a2[i] = x %M2;  a1[i] = x %M1;
         }
         for( size_t i=0 ; i<m ; ++i )  {
             u64  x = B[i].get();
-            b3[i] = Mint<M3>( x );  b2[i] = Mint<M2>( x );  b1[i] = Mint<M1>( x );
+            b3[i] = x %M3;  b2[i] = x %M2;  b1[i] = x %M1;
         }
         a3 *= b3;  a2 *= b2;  a1 *= b1;
 
