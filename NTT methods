@@ -490,4 +490,161 @@ class FormalPowerSeries
         p.resize( sz );
         return  fps_kth_term( p, q, k );
     }
+
+    T  evaluate( i64 x )  {
+        T  ans = 0,  powx = 1;
+        for( auto &v : a )  {
+            ans += v*powx;
+            powx *= x;
+       }
+       return  ans;
+    }
+
+    vector<T>  findRoots()  {
+        FPS  x = { 0, 1 };
+        FPS  p = x.modPow( T::get_mod(), *this );
+        if( p.size() < 2 )   p.resize( 2 );
+        p.a[1] -= 1;
+        FPS  q = p.polyGCD( *this );
+        vector<T>  ans;
+        q.findRootsDFS( ans );
+        return  ans;
+    }
+
+    FPS  modPow( u64 k, FPS g )  {  // this ^k mod g
+        assert( g.size() );
+        auto  inv = g.rev().inverse();
+        FPS   res{ 1 },  b( *this );
+        while( k )  {
+            if( k & 1 )  {
+                res *= b;   res -= res/g * g;
+                res.shrink();
+            }
+            b *= b;   b -= b/g * g;
+            b.shrink();
+            k >>= 1;
+        }
+        return  res;
+    }
+
+  private:  // THIS STUFF IS FOR POLYNOMIAL INVERSE
+    using  Arr = array<FPS, 2>;
+    using  Mat = array<Arr, 2>;
+
+    VPoly  cut( VPoly a, int k )  {
+        for( size_t i=0 ; i<2 ; ++i )   a[i] = a[i].shift( -k );
+        return a;
+    }
+    friend Mat  operator * ( const Mat& a, const Mat& b )  {
+        Mat  res;
+        for( size_t i=0 ; i<2 ; ++i )
+            for( size_t j=0 ; j<2 ; ++j )
+                for( size_t k=0 ; k<2 ; ++k )
+                    res[i][k] += a[i][j] * b[j][k];
+        return res;
+    }
+    friend VPoly  operator * ( const Mat& A, const VPoly& b )  {
+        VPoly  ret( 2 );
+        for( int i=0 ; i<2 ; ++i )  {
+            FPS  tmp = A[i][0] * b[0] + A[i][1] * b[1];
+            tmp.shrink();
+            ret[i] = tmp;
+        }
+        return ret;
+    }
+    Mat  getID()  {
+        FPS  zro = FPS( { 0 } ),  one = FPS( { 1 } );
+        Mat  ID  = { Arr{ one, zro }, Arr{ zro, one } };
+        return  ID;
+	}
+    void  step( Mat& m, VPoly& A )  {
+        auto [q, r] = A[0].divmod( A[1] );
+        r.shrink();
+        A = { A[1], r };
+        FPS  temp1 = m[0][0] - q * m[1][0];  temp1.shrink();
+        FPS  temp2 = m[0][1] - q * m[1][1];  temp2.shrink();
+        m = { m[1], { temp1, temp2 } };
+    }
+
+    Mat  hGCD( VPoly A )  {
+        size_t  sz = A[0].size()/2;
+        if( A[1].size() <= sz )   return  getID();
+        Mat  R = hGCD( cut( A, sz ) );    A = R * A;
+        if( A[1].size() <= sz )   return  R;
+        step( R, A );
+        if( A[1].size() <= sz )   return  R;
+        int  k = 2*sz + 1 - (int)A[0].size();
+        return  hGCD( cut( A, k ) ) * R;
+    }
+
+    Mat  euclid( VPoly A )  {
+        Mat  mat = hGCD( A );   A = mat * A;
+        if( !A[1].size() )   return  mat;
+        step( mat, A );
+        if( !A[1].size() )   return  mat;
+        return  euclid( A ) * mat;
+    }
+
+  public:
+    FPS  polyGCD( const FPS &b )  {
+        Mat  mat = getID();
+        VPoly  A = { *this, b };
+        step( mat, A );
+        if( A[1].size() )   mat = euclid( A )* mat;
+        FPS  gcd = mat[0][0] * (*this) + mat[0][1] * b;
+        gcd.shrink();
+        return  gcd;
+    }
+
+    // REF:  https://math.stackexchange.com/questions/124300/
+    //       finding-inverse-of-polynomial-in-a-field
+    //  RETURNS  INVERSE OF (*this) MOD  b
+    //  IFF NO INVERSE EXITS, RETURNS ans WITH size > size of b
+    FPS  polyInverse( const FPS &b )  {
+        Mat  mat = getID();
+        VPoly  A = { *this, b };
+        step( mat, A );
+        if( A[1].size() )   mat = euclid( A ) * mat;
+        FPS  gcd = mat[0][0] * (*this) + mat[0][1] * b;
+        gcd.shrink();
+        if( gcd.size() != 1 )   return  FPS( b.size() + 1 );
+        size_t  sz = mat[0][0].size();
+        FPS  ans( sz );
+        T  v = gcd[0].inverse();
+        for( size_t i=0 ; i<sz ; ++i )   ans[i] = mat[0][0][i] * v;
+        ans.shrink();
+        return  ans;
+    }
+  private:
+    constexpr FPS  low( int s ) const  {
+        return FPS( { a.begin(), a.begin() + min( max( s, 1 ), int( size() ) ) } );
+    }
+    void  shrink()  { while( a.size()  &&  a.back() == 0 )  a.pop_back(); }
+    FPS  rev() const  {
+        FPS  ret( *this );
+        reverse( ret.a.begin(), ret.a.end() );
+        return  ret;
+    }
+    constexpr FPS  shift( int x )  {
+        FPS  ret = *this;
+        if( x >= 0 )   ret.a.insert( begin( ret.a ), x, 0 );
+        else  ret.a.erase( begin( ret.a ), begin( ret.a ) - x );
+        return  ret;
+    }
+
+    void  findRootsDFS( vector<T> &roots )  {
+        static std::mt19937  rng{ 0 };
+        if( size() == 1 )  return;
+        if( size() == 2 )  {
+            roots.push_back( -a[0] / a[1] );
+            return;
+        }
+        FPS  u { T( rng() ), T( 1 ) };
+        FPS  v = u.modPow( ( T::get_mod() - 1 )/2, *this );
+        --v[0];
+        FPS  g = v.polyGCD( *this );
+        g.findRootsDFS( roots );
+        FPS  Q = (*this) / g;
+        Q.findRootsDFS( roots );
+    }
 };
