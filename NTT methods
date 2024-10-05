@@ -1,27 +1,165 @@
-template < typename T, bool any = false >
+#include <iostream>
+#include <vector>
+#include <algorithm>
+#include <array>
+#include <cassert>
+#include <random>
+using namespace std;
+
+using  u64 = uint64_t;
+using  u32 = uint32_t;
+
+template <uint32_t mod>  // MOD INT STORED IN MONTGOMERY FORM
+class  Mint
+{
+  private:
+    using  i32 = int32_t;    using  i64 = int64_t;
+    using  u32 = uint32_t;   using  u64 = uint64_t;
+
+    static constexpr u32  get_r()  {
+        u32  ret = mod;
+        for( i32 i=0 ; i<4 ; ++i )  ret *= 2 - mod * ret;
+        return  ret;
+    }
+
+    static constexpr u32  reduce( const u64 &b )  {
+        return ( b + u64( u32( b ) * u32( -r ) ) * mod ) >> 32;
+    }
+
+    // CLASS MEMBER DATA
+    static constexpr u32  r  = get_r();
+    static constexpr u32  n2 = -u64( mod ) % mod;
+	u32                   a;
+
+    static_assert( r * mod == 1, "invalid, r * mod != 1" );
+    static_assert( mod < (1 << 30), "invalid, mod >= 2 ^ 30" );
+    static_assert( (mod & 1) == 1, "invalid, mod % 2 == 0" );
+
+  public:
+    // CONSTRUCTORS
+    constexpr Mint() : a( 0 ) {}
+    constexpr Mint( i64 b )
+        : a( reduce( u64( b % mod + mod ) * n2 ) ) {};
+
+    // ARITMETIC OPERATORS
+    constexpr Mint &operator += ( const Mint &b )  {
+        if( i32( a += b.a - 2 * mod ) < 0 )   a += 2 * mod;
+        return  *this;
+    }
+    constexpr Mint &operator -= ( const Mint &b )  {
+        if( i32( a -= b.a ) < 0 )   a += 2 * mod;
+        return  *this;
+    }
+    constexpr Mint &operator *= ( const Mint &b )  {
+        a = reduce( u64( a ) * b.a );
+        return  *this;
+    }
+    constexpr Mint &operator /= ( const Mint &b )  {
+        *this *= b.inverse();
+        return  *this;
+    }
+
+    constexpr Mint operator  + (const Mint &b) const { return Mint(*this) += b; }
+    constexpr Mint operator  - (const Mint &b) const { return Mint(*this) -= b; }
+    constexpr Mint operator  * (const Mint &b) const { return Mint(*this) *= b; }
+    constexpr Mint operator  / (const Mint &b) const { return Mint(*this) /= b; }
+    constexpr Mint operator - () const {  return  Mint() - Mint(*this); }
+    Mint& operator         ++ ()  { return  *this += Mint( 1 ); }
+    Mint& operator         -- ()  { return  *this -= Mint( 1 ); }
+
+    constexpr Mint  pow( u64 n ) const  {
+        Mint  ret(  1 ), mul( *this );
+        while( n > 0 )  { if( n & 1 )  ret *= mul;   mul *= mul;  n >>= 1; }
+        return  ret;
+    }
+    constexpr Mint  inverse() const { return  pow( mod - 2 ); }
+    constexpr u32  get() const  {
+        u32  ret = reduce( a );
+        return  ret >= mod ? ret - mod : ret;
+    }
+    static constexpr u32  get_mod()  { return mod; }
+
+    constexpr bool operator == (const Mint &b) const {
+        return ( a >= mod ? a - mod : a ) == ( b.a >= mod ? b.a - mod : b.a );
+    }
+    constexpr bool operator != (const Mint &b) const  {
+        return ( a >= mod ? a - mod : a ) != ( b.a >= mod ? b.a - mod : b.a );
+    }
+    int  legendre()  { return  pow( ( mod - 1 ) >> 1 ).get(); }
+    int  tonelli()  {  // RETURNS -1 IF NO INV, ELSE CAST TO Mint
+        if( a == 0 )            return   0;
+        if( legendre() != 1 )   return  -1;
+        int  s = 0,  q = mod - 1;
+        while( q %2 == 0 )  { q >>= 1;  ++s; }
+        if( s == 1 )   return  pow( (mod + 1)>>2 ).get();
+        Mint  z = 2,  val = mod - 1;
+        for( ; z != Mint( 0 ) ; ++z )
+            if( val == z.legendre() )   break;
+        Mint  c = z.pow( q );    Mint  r = pow( ( q + 1 ) >> 1 );
+        Mint  t = pow( q );         int  m = s;
+        while( t.get() != 1 )  {
+            z = t*t;   int  i = 1;
+            for( ; i<s ; ++i )  {
+                if( z.get() == 1 )    break;
+                z *= z; }
+            auto  b = c.pow( 1 << (m - i - 1) );
+            r *= b;  c = b*b;  t *= c;  m = i; }
+        return  min( r.get(), mod - r.get() );
+    }
+
+    // INPUT AND OUTPUT
+    friend ostream &operator << ( ostream &os, const Mint &b )  {
+        return  os << b.get();
+    }
+    friend istream &operator >> ( istream &is, Mint &b )  {
+        int64_t  t;  is >> t;
+        b = Mint( t );
+        return  is;
+    }
+};
+
+template < typename T >
 class FormalPowerSeries
 {
   public:
-    using  i64    = int64_t;
-    using  FPS   = FormalPowerSeries<T, any>;
+    using  i64  = int64_t;
+    using  FPS  = FormalPowerSeries<T>;
     using  VPoly = vector<FPS>;
-    
-	vector<T>  a;
+
+    // CLASS DATA
+    vector<T>  a;
 
   public:
-    FormalPowerSeries( size_t sz = 0 )  { a.resize( sz, 0 ); }
-    FormalPowerSeries( const initializer_list<T>  v )  { a = v; }
-    FormalPowerSeries( const vector<T>  &v )  { a = v; }
-    FormalPowerSeries( size_t sz, T val )  { a.resize( sz, val ); }
-    size_t  size() const { return a.size(); }
+    // CONSTRUCTORS
+    constexpr FormalPowerSeries( size_t sz = 0 )  { a.resize( sz, 0 ); }
+    constexpr FormalPowerSeries( const initializer_list<T>  v )  { a = v; }
+    constexpr FormalPowerSeries( const vector<T>  &v )  { a = v; }
+    constexpr FormalPowerSeries( size_t sz, T val )  { a.resize( sz, val ); }
+    constexpr size_t  size() const { return a.size(); }
     void  resize( size_t sz, T m = 0 )  { (*this).a.resize( sz, m ); }
 
-    FPS  operator - ( const FPS &a ) const { return  FPS(*this) -= a; }
-    FPS  operator + ( const FPS &a ) const { return  FPS(*this) += a; }
-    FPS  operator * ( const i64 a )  const { return  FPS(*this) *= a; }
-    FPS  operator * ( const FPS &a ) const { return  FPS(*this) *= a; }
-    FPS  operator / ( const FPS &a ) const { return  FPS(*this) /= a; }
-    FPS  operator % ( const FPS &a ) const { return  FPS(*this) %= a; }
+    T &operator [] ( size_t  x ) { assert( x < this->a.size() );  return  a[x]; }
+    constexpr T operator [] ( size_t  x ) const { assert( x < this->a.size() );  return  a[x]; }
+
+    // INPUT AND OUTPUT
+    friend std::ostream &operator << ( std::ostream &os, const FPS &p )  {
+        if( p.size()== 0 )  { os << "0";  return  os; }
+        for( auto &v : p.a )   os << v << " ";
+        return  os;
+    }
+    friend istream& operator >> ( istream& is, FPS &p )  {
+        for( auto &v : p.a )  { i64 w;  is >> w;  v = w; }   return  is;
+    }
+
+    // MATHEMATICAL OPERATORS
+    constexpr FPS  operator - ( const FPS &a ) const { return  FPS(*this) -= a; }
+    constexpr FPS  operator + ( const FPS &a ) const { return  FPS(*this) += a; }
+    constexpr FPS  operator * ( const i64 a  ) const { return  FPS(*this) *= a; }
+    constexpr FPS  operator * ( const FPS &a ) const { return  FPS(*this) *= a; }
+    constexpr FPS  operator / ( const FPS &a ) const { return  FPS(*this) /= a; }
+    constexpr FPS  operator % ( const FPS &a ) const { return  FPS(*this) %= a; }
+
+    FPS  &operator  = ( const FPS &r )  { this->a = r.a;  return  *this; }
     FPS  &operator += ( const FPS &r )  {
         this->resize( max( this->size(), r.size() ) );
         for( size_t i=0 ; i<r.size() ; ++i )  this->a[i] += r.a[i];
@@ -36,6 +174,10 @@ class FormalPowerSeries
         for( size_t i=0 ; i<this->size() ; ++i )  this->a[i] *= v;
         return  *this;
     }
+    FPS  &operator *= ( const T &v )  {
+        for( size_t i=0 ; i<this->size() ; ++i )  this->a[i] *= v;
+        return  *this;
+    }
     FPS  &operator *= ( const FPS &r )  {
         this->convolution_inplace( r );
         return  *this;
@@ -43,37 +185,81 @@ class FormalPowerSeries
     FPS  &operator /= ( const FPS &r )  {  // = Q OF POLY DIVISION
         if( size() < r.size() )   return *this = FPS( 0 );
         int  n = this->size() - r.size() + 1;
+        if( (int)r.size() <= 32 )  {
+            FPS  f( *this ),  g( r );
+            g.shrink();
+            int  coeff = g.a.back().inverse().get();
+            g *= coeff;
+            int  deg = (int)f.size() - (int)g.size() + 1;
+            int  gs  = g.size();
+            FPS  quo( deg );
+            for( int i=deg-1 ; i>=0 ; --i )  {
+                quo[i] = f[i+gs-1];
+                for( int j=0 ; j<gs ; ++j )  f[i+j] -= quo[i] * g[j];
+            }
+            *this = quo * coeff;
+            this->resize( n, 0 );
+            return *this;
+        }
         return *this = ( (*this).rev().low( n ) * r.rev().inverse( n ) ).low( n ).rev();
     }
-    FPS  &operator %= ( const FPS &Q )  {
-        if( Q.size() > size() )  return *this;
-        if( Q.size() < 128 ) {
-            int  dQ = Q.size() - 1;
-            while( dQ  &&  Q[dQ] == 0 )  --dQ;
-            assert( Q[dQ] != 0 );
-            for( int i=size()-1 ; i>=dQ ; --i ) {
-                if( a[i] == 0 )  continue;
-                T  x = a[i] / Q[dQ];
-                a[i] = 0;
-                for( int j=1 ; j<=dQ ; ++j )
-                    a[i-j] -= x * Q[dQ - j];
-            }
-            shrink();
-            return  *this;
-        }
-        FPS  P = (*this) / Q;
-        P *= Q;
-        int  dR = -1;
-        for( int i=0 ; i<Q.size()-1 ; ++i )  {
-            P.a[i] = a[i] - P[i];
-            if( P[i] != 0 )  dR = i;
-        }
-        a.resize( dR + 1 );
-        for( int i=0 ; i<=dR ; ++i )  a[i] = P[i];
-        shrink();
-        return  size() == 0 ? (*this) = FPS( { 0 } ) : (*this );
+
+    FPS  &operator %= ( const FPS &P )  {
+        if( P.size() > size() )  return *this;
+        auto [ _, r ] = (*this).divmod( P );
+        return  (*this) = r;
     }
-    FPS  low( int s ) const  {
+
+    pair<FPS, FPS>  divmod( const FPS &D )  {
+        if( D.size() > this->size() )  return { {},*this };
+        FPS  Q = (*this) / D,   R = Q * D;
+        int  n = D.size(),  j = -1;
+        for( int i=0 ; i<n-1 ; ++i )  {
+            R[i] = a[i] - R[i];
+            if( R[i] != 0 )  j = i;
+        }
+        R.a.resize( j + 1 );
+        return  { Q, R };
+    }
+
+    FPS  inverse( int dgr = -1 ) const  {
+        size_t  n = this->size();
+        assert( n != 0  &&  a[0] != 0 );
+        size_t  deg = ( dgr == -1 ) ? n : size_t( dgr );
+        FPS  r( { T( 1 ) / a[0] } );
+
+        for( size_t m=1 ; m<deg ; m*=2 )  {
+            size_t  twoM = m << 1;
+            FPS  f( { a.begin(), a.begin() + min( n, twoM ) } );
+            FPS  g( r );
+            f.resize( twoM ),  f.ntt( false );
+            g.resize( twoM ),  g.ntt( false );
+            for( size_t i=0 ; i<twoM ; ++i )  f[i] *= g[i];
+            f.ntt( true );
+            f.a.erase( f.a.begin(), f.a.begin() + m );
+            f.resize( twoM ),  f.ntt( false );
+            for( size_t i=0 ; i<twoM ; ++i )  f[i] *= g[i];
+            f.ntt( true );
+            for( size_t i=0 ; i<twoM ; ++i )  f[i] = -f[i];
+            r.a.insert( r.a.end(), f.a.begin(), f.a.begin() + m );
+        }
+        return  r.low( deg );
+    }
+
+    FPS  convolution_brute(const FPS &a, const FPS &b ) const  {
+        size_t  n = a.size(),  m = b.size();
+        FPS  ans( n + m - 1 );
+        if( n < m )
+            for( size_t j=0 ; j<m ; ++j )
+                for( size_t i=0 ; i<n ; ++i )   ans[i+j] += a[i]*b[j];
+        else
+            for( size_t i=0 ; i<n ; ++i )
+                for( size_t j=0 ; j<m ; ++j )   ans[i+j] += a[i]*b[j];
+        return ans;
+    }
+
+  private:
+    constexpr FPS  low( int s ) const  {
         return FPS( { a.begin(), a.begin() + min( max( s, 1 ), int( size() ) ) } );
     }
     void shrink()  { while( a.size()  &&  a.back() == 0 )  a.pop_back(); }
@@ -82,29 +268,13 @@ class FormalPowerSeries
         reverse( ret.a.begin(), ret.a.end() );
         return ret;
     }
-    FPS  shift( int x )  { 
+    constexpr FPS  shift( int x )  {
         FPS  ret = *this;
         if( x >= 0 )   ret.a.insert( begin( ret.a ), x, 0 );
         else  ret.a.erase( begin( ret.a ), begin( ret.a ) - x );
-        return  ret; 
-    }
-    T  &operator [] ( size_t  x )  {
-        assert( x < this->a.size() );
-        return  a[x];
-    }
-    const T  &operator [] ( size_t  x ) const {
-        assert( x < this->a.size() );
-        return  a[x];
-    }
-    friend std::ostream &operator << ( std::ostream &os, const FPS &p )  {
-        for( auto &v : p.a )   os << v << " ";
-        return  os;
-    }
-    friend istream& operator >> ( istream& is, FPS &p )  {
-	    for( auto &v : p.a )  { i64 w;  is >> w;  v = w; }   return  is;
+        return  ret;
     }
 
-  private:    
     void ntt( bool inverse )  {
         static bool  first = true;
         static T  dw[30], idw[30];
@@ -113,7 +283,7 @@ class FormalPowerSeries
             T  root = 2;
             unsigned  mod = T::get_mod();
             while( root.pow( (mod - 1) / 2) == 1 )   ++root;
-            for( size_t i=0 ; i<30 ; ++i ) 
+            for( size_t i=0 ; i<30 ; ++i )
                 dw[i]  = -root.pow( (mod - 1) >> (i + 2) ),
                 idw[i] = T(1) / dw[i];
         }
@@ -145,23 +315,10 @@ class FormalPowerSeries
         auto  c = T( 1 ) / T( inverse ? n : 1 );
         for( auto&& e : this->a )  e *= c;
     }
-    
-    FPS  convolution_brute( FPS &a, FPS &b ) const  {
-        size_t  n = a.size(),  m = b.size();
-        FPS  ans( n + m - 1 );
-        if( n < m )
-            for( size_t j=0 ; j<m ; ++j )
-                for( size_t i=0 ; i<n ; ++i )   ans[i+j] += a[i]*b[j];
-        else 
-            for( size_t i=0 ; i<n ; ++i )
-                for( size_t j=0 ; j<m ; ++j )   ans[i+j] += a[i]*b[j];
-        return ans;
-    }
 
     FPS&  convolution_inplace( FPS b )  {
         if( this->size() == 0  ||  b.size() == 0 )  {
             this->a.clear();  return  *this; }
-
 
         size_t  n = this->size(),  m = b.size(),  sz = 1 << __lg( 2*(n+m-1) - 1 );
         if( min( n, m ) <= 60 )   return  *this = convolution_brute( *this, b );
@@ -172,34 +329,44 @@ class FormalPowerSeries
         return  *this;
     }
 
-
-  public:
-  // f(x)^-1 
-    FPS  inverse( int dgr = -1 ) const  {
-        size_t  n = this->size();
-        assert( n != 0  &&  a[0] != 0 );
-        size_t  deg = ( dgr == -1 ) ? n : size_t( dgr );
-        FPS  r( { T( 1 ) / a[0] } );
-
-        for( size_t m=1 ; m<deg ; m*=2 )  {
-            size_t  twoM = m << 1;
-            FPS  f( { a.begin(), a.begin() + min( n, twoM ) } );
-            FPS  g( r );
-            f.resize( twoM ),  f.ntt( false );
-            g.resize( twoM ),  g.ntt( false );
-            for( size_t i=0 ; i<twoM ; ++i )  f[i] *= g[i];
-            f.ntt( true );
-            f.a.erase( f.a.begin(), f.a.begin() + m );
-            f.resize( twoM ),  f.ntt( false );
-            for( size_t i=0 ; i<twoM ; ++i )  f[i] *= g[i];
-            f.ntt( true ); 
-            for( size_t i=0 ; i<twoM ; ++i )  f[i] = -f[i];
-            r.a.insert( r.a.end(), f.a.begin(), f.a.begin() + m );
+  private:  // USED BY SQRT
+    void  prepSqrt()  {
+        size_t  n = a.size();
+        FPS  rt( { 1 } );
+        T  inv = ( T::get_mod() + 1 ) >> 1;
+        while( rt.size() < n )  {
+            FPS  f( { a.begin(), a.begin() + min( n, rt.size() << 1 ) } );
+            FPS  sv = rt;
+            rt.resize( rt.size() << 1 );
+            f *= rt.inverse();    f += sv;
+            for( size_t i=rt.size() >> 1 ; i<rt.size() ; ++i )   rt[i] = f[i]*inv;
         }
-        return  r.low( deg );
+        rt.resize( n );
+        a = rt.a;
     }
 
-  // f'(x)
+  public:
+  // SQRT(f(x)) - EMPTY IF NO SQRT.  MAY NEED TO RESIZE RESULT.
+    FPS&  sqrt_inplace()  {
+        size_t  n = a.size(),   zeros = 0;
+        reverse( a.begin(), a.end() );
+        while( !a.empty()  &&  a.back() == 0 )  a.pop_back(), ++zeros;
+        if( a.empty() )    return  *this = FPS( n );
+        if( zeros & 1 )    return  *this = FPS( 0 );
+        reverse( a.begin(), a.end() );
+        int  irt = a[0].tonelli();
+        if( irt == -1 )    return  *this = FPS( 0 );
+        zeros >>= 1;
+        a.insert( a.end(), zeros, 0 );
+        *this *= a[0].inverse();
+        prepSqrt();
+        *this *= irt;
+        a.insert( a.begin(), zeros, 0 );
+        a.resize( n );
+        return  *this;
+    }
+    FPS  sqrt() const { return FPS( *this ).sqrt_inplace(); }
+
     FPS&  differential_inplace()  {
         const size_t  n = this->a.size();
         assert( n > 0 );
@@ -209,7 +376,6 @@ class FormalPowerSeries
     }
     FPS  differential() const { return  FPS( *this ).differential_inplace(); }
 
-  // integral f(x)dx
     FPS&  integral_inplace() {
         const size_t  n = this->a.size();
         assert( n > 0 );
@@ -220,9 +386,8 @@ class FormalPowerSeries
         for( size_t i=2 ; i<=n ; ++i )  this->a[i] *= inv[i];
         return  *this;
     }
-    FPS  integral() const { return FPS( *this ).integ_inplace(); }
+    FPS  integral() const { return FPS( *this ).integral_inplace(); }
 
-  // exp(f(x)) 
     FPS&  exp_inplace( int deg = -1 )  {
         size_t  n = this->size();
         assert( n > 0  &&  a[0] == 0 );
@@ -231,10 +396,9 @@ class FormalPowerSeries
         this->resize( deg );
         this->a[0] = 1;
         FPS  h_drv = this->differential();
-        for( size_t m=1 ; m<deg ; m*=2 )  {
+        for( size_t m=1 ; m<size_t( deg ) ; m*=2 )  {
             FPS  f_fft( { a.begin(), a.begin() + m } );
             f_fft.resize( 2*m ), f_fft.ntt( false );
-            T  invm = T( 1 ) / m;
 
             if( m > 1 )  {
                 FPS  _f( m );
@@ -249,7 +413,7 @@ class FormalPowerSeries
                 g.a.insert( g.a.end(), _f.a.begin(), _f.a.begin() + m/2 );
             }
 
-            FPS  t( { a.begin(), a.begin() + m } ); 
+            FPS  t( { a.begin(), a.begin() + m } );
             t.differential_inplace();
             {
                 FPS  r( { h_drv.a.begin(), h_drv.a.begin() + m - 1 } );
@@ -260,18 +424,18 @@ class FormalPowerSeries
                 t.a.insert( t.a.begin(), t.a.back() );  t.a.pop_back();
             }
 
-            t.resize( 2*m );  t.ntt( false ); 
+            t.resize( 2*m );  t.ntt( false );
             g_fft = g;  g_fft.resize( 2*m );  g_fft.ntt( false );
             for( size_t i=0 ; i<2*m ; ++i )  t[i] *= g_fft[i];
             t.ntt( true );
             t.resize( m );
-            
+
             FPS  v( { a.begin() + m, a.begin() + min( deg, int( 2*m ) ) } );
             v.resize( m );
             t.a.insert( t.a.begin(), m-1, 0 );  t.a.push_back( 0 );
-            
+
             t.integral_inplace();
-            
+
             for( size_t i=0 ; i<m ; ++i )    v[i] -= t[m+i];
             v.resize( 2*m );  v.ntt( false );
             for( size_t i=0 ; i<2*m ; ++i )  v[i] *= f_fft[i];
@@ -281,15 +445,14 @@ class FormalPowerSeries
             for( size_t i=0 ; i<min( deg-m, m ) ; ++i )  a[m+i] = v[i];
         }
         return  *this;
-    }   
+    }
     FPS  exp( const int deg = -1 ) const { return  FPS( *this ).exp_inplace( deg ); }
 
-  // log(f(x)) 
     FPS&  log_inplace( int deg = -1 )  {
         size_t  n = this->size();
         assert( n > 0  &&  this->a[0] == 1 );
         if( deg == -1 )  deg = n;
-        if( deg < n )    this->resize( deg );
+        if( size_t( deg ) < n )    this->resize( deg );
         FPS  f_inv = this->inverse();
         this->differential_inplace();
         *this *= f_inv;
@@ -297,17 +460,20 @@ class FormalPowerSeries
         this->integral_inplace();
         this->resize( deg );
         return  *this;
-    }  
+    }
     FPS  log( const int deg = -1 ) const { return FPS( *this ).log_inplace( deg ); }
 
-  // f(x)^k
-    FPS&  pow_inplace( i64 k, int dgr = -1 )  {
-        assert( dgr >= -1 );
-        size_t  n = size();
-        size_t  deg = ( dgr == -1 ) ? n : size_t( dgr );
-        size_t  l = 0;
+    FPS&  pow_inplace( int64_t k )  {
+        int64_t  deg = this->size();
+        if( k == 0 )  {
+            this->a.assign( deg, 0 );
+            this->a[0] = 1;
+            return  *this;
+        }
+
+        int64_t  l = 0;
         while( this->a[l] == 0 )   ++l;
-        if( k*l > deg )   return  *this = FPS( deg );
+        if( l >= (deg-1)/k + 1 )   return  *this = FPS( deg );
         T  ic = a[l].inverse();
         T  pc = a[l].pow( k );
         a.erase( a.begin(), a.begin() + l );
@@ -320,9 +486,9 @@ class FormalPowerSeries
         this->resize( deg );
         return  *this;
     }
-    FPS  pow( i64 k, int deg = -1 ) const { return FPS(*this).pow_inplace( k, deg ); }
+    FPS  pow( int64_t k ) const { return FPS(*this).pow_inplace( k ); }
 
-  // f(g(x))
+    // f(g(x))
     FPS&  composition_inplace( const FPS &P )  {
         size_t  n = P.size();
         assert( n == size() );
@@ -350,7 +516,7 @@ class FormalPowerSeries
                     for( size_t d=0 ; d<pow1[j].size() ; ++d )
                         f[d] += pow1[j][d]*coef;
                 }
-            } 
+            }
             f *= pow2[i];
             f.resize( n );
             for( size_t j=0 ; j<n ; ++j )  ans[j] += f[j];
@@ -360,24 +526,12 @@ class FormalPowerSeries
     }
     FPS  composition( const FPS &P ) { return FPS(*this).composition_inplace( P ); }
 
-  // f(x)/g(x)  QUOTIENT USING / THEN CALC REMAINDER   
-    pair<FPS, FPS>  divmod( const FPS &D )  {
-        if( D.size() > this->size() )  return { {},*this };
-        FPS  Q = (*this) / D;
-        FPS  R = Q * D;
-        int  n = D.size(),  j = -1;
-        for( int i=0 ; i<n-1 ; ++i )  {
-            R[i] = a[i] - R[i];
-            if( R[i] != 0 )  j = i;
-        }
-        R.a.resize( j + 1 );
-        return  { Q, R };
-    }
-    
+//  *****   VERIFIED TO HERE  *****
+
   private:   // FOR MULTIPOINT EVALUATION AND POLYNOMIAL INTERPOLATION
-    // BUILDS SEGMENT TREE  T  FOR  prod( x - pts[i] 
+    // BUILDS SEGMENT TREE  T  FOR  prod( x - pts[i]
 	// REF:  https://cp-algorithms.com/algebra/polynomial.html
-    void  subprodTree( VPoly &tree, size_t rt, size_t l, size_t r )  
+    void  subprodTree( VPoly &tree, size_t rt, size_t l, size_t r )
     {
         if( l + 1 == r )  {
             tree[rt] = { (*this)[l] == 0 ? 0 : -(*this)[l], 1 };
@@ -409,11 +563,11 @@ class FormalPowerSeries
         if( l + 1 == r )   return { (*this)[l] };
 
         size_t  lKid = 2*rt,   rKid = lKid + 1,   m = ( l + r ) >> 1;
-        
+
         return  tree[rKid] * interp( tree, lKid, l, m ) +
                 tree[lKid] * interp( tree, rKid, m, r );
     }
-    
+
   public:
     // OVERWRITES pts WITH p EVALUATED AT pts
     FPS  multiPtEvaluation_IP( FPS& pts )
@@ -422,7 +576,7 @@ class FormalPowerSeries
         if( size() == 0 )   return  FPS( nSave );
         pts.resize( max( size(), pts.size() ) );
         size_t  n = pts.size();
-    
+
         // BUILD SEGMENT TREE FOR PRODUCTS
         VPoly  tree( n*4, FPS() );
         pts.subprodTree( tree, 1, 0, n );
@@ -444,19 +598,19 @@ class FormalPowerSeries
 
         VPoly  tree( 4*n, FPS() );
         (*this).subprodTree( tree, 1, 0, n );
-        
+
         FPS  d = tree[1].differential();
         (*this).multiPtEvaluation( tree, 1, 0, n, d );
 
         for( size_t i=0 ; i<size() ; ++i )   (*this)[i] = b[i] / (*this)[i];
-		  
+
         (*this) = (*this).interp( tree, 1, 0, n );
-        
+
         (*this).resize( n );
         return  *this;
     }
     FPS  interpolate( const FPS &b ) { return  FPS( *this ).interpolate_IP( b ); }
-    
+
   private:  // FOR k-th TERM OF LINEAR RECURRENCE - BOSTAN-MORI ALGORITHM
     friend void  half( FPS &A, bool odd )  {
         for( size_t i=odd ; i<A.size() ; i+=2 )   A[i >> 1] = A[i];
@@ -615,23 +769,8 @@ class FormalPowerSeries
         ans.shrink();
         return  ans;
     }
-  private:
-    constexpr FPS  low( int s ) const  {
-        return FPS( { a.begin(), a.begin() + min( max( s, 1 ), int( size() ) ) } );
-    }
-    void  shrink()  { while( a.size()  &&  a.back() == 0 )  a.pop_back(); }
-    FPS  rev() const  {
-        FPS  ret( *this );
-        reverse( ret.a.begin(), ret.a.end() );
-        return  ret;
-    }
-    constexpr FPS  shift( int x )  {
-        FPS  ret = *this;
-        if( x >= 0 )   ret.a.insert( begin( ret.a ), x, 0 );
-        else  ret.a.erase( begin( ret.a ), begin( ret.a ) - x );
-        return  ret;
-    }
 
+  private:
     void  findRootsDFS( vector<T> &roots )  {
         static std::mt19937  rng{ 0 };
         if( size() == 1 )  return;
@@ -648,3 +787,23 @@ class FormalPowerSeries
         Q.findRootsDFS( roots );
     }
 };
+
+constexpr unsigned  mod  = 998244353;
+using  mint = Mint<mod>;
+using  FPS  = FormalPowerSeries<mint>;
+
+
+int  main()  {
+    ios_base::sync_with_stdio( false );
+    cin.tie( NULL );
+
+    size_t  N;
+    cin >> N;
+
+    FPS  p( N ),  v( N );
+    cin >> p >> v;
+
+    cout << p.composition( v ) << '\n';
+
+    return 0;
+}
