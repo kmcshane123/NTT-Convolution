@@ -526,8 +526,6 @@ class FormalPowerSeries
     }
     FPS  composition( const FPS &P ) { return FPS(*this).composition_inplace( P ); }
 
-//  *****   VERIFIED TO HERE  *****
-
   private:   // FOR MULTIPOINT EVALUATION AND POLYNOMIAL INTERPOLATION
     // BUILDS SEGMENT TREE  T  FOR  prod( x - pts[i]
 	// REF:  https://cp-algorithms.com/algebra/polynomial.html
@@ -665,6 +663,8 @@ class FormalPowerSeries
         return  ans;
     }
 
+//  *********** VERIFIED TO HERE ************
+
     FPS  modPow( u64 k, FPS g )  {  // this ^k mod g
         assert( g.size() );
         auto  inv = g.rev().inverse();
@@ -797,13 +797,17 @@ int  main()  {
     ios_base::sync_with_stdio( false );
     cin.tie( NULL );
 
-    size_t  N;
+    int N;
     cin >> N;
 
-    FPS  p( N ),  v( N );
-    cin >> p >> v;
+    FPS f( N + 1 );
+    cin >> f;
 
-    cout << p.composition( v ) << '\n';
+    auto  a = f.findRoots();
 
-    return 0;
+    cout << a.size() << '\n';
+    for( auto &x : a )  cout << x.get() << ' ';
+    cout << '\n';
+
+    return  0;
 }
