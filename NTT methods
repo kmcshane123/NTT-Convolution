@@ -121,15 +121,14 @@ class  Mint
 template < typename T >
 class FormalPowerSeries
 {
-  public:
-    using  i64  = int64_t;
-    using  FPS  = FormalPowerSeries<T>;
+    using  i64   = int64_t;
+    using  FPS   = FormalPowerSeries<T>;
     using  VPoly = vector<FPS>;
+    using  Poly  = FormalPowerSeries<T>;
 
-    // CLASS DATA
+  public:
     vector<T>  a;
 
-  public:
     // CONSTRUCTORS
     constexpr FormalPowerSeries( size_t sz = 0 )  { a.resize( sz, 0 ); }
     constexpr FormalPowerSeries( const initializer_list<T>  v )  { a = v; }
@@ -143,7 +142,7 @@ class FormalPowerSeries
 
     // INPUT AND OUTPUT
     friend std::ostream &operator << ( std::ostream &os, const FPS &p )  {
-        if( p.size()== 0 )  { os << "0";  return  os; }
+        if( p.size()== 0 )  { os << " ";  return  os; }
         for( auto &v : p.a )   os << v << " ";
         return  os;
     }
@@ -204,15 +203,15 @@ class FormalPowerSeries
         return *this = ( (*this).rev().low( n ) * r.rev().inverse( n ) ).low( n ).rev();
     }
 
-    FPS  &operator %= ( const FPS &P )  {
+    Poly  &operator %= ( const Poly &P )  {
         if( P.size() > size() )  return *this;
         auto [ _, r ] = (*this).divmod( P );
         return  (*this) = r;
     }
 
-    pair<FPS, FPS>  divmod( const FPS &D )  {
+    pair<Poly, Poly>  divmod( const Poly &D )  {
         if( D.size() > this->size() )  return { {},*this };
-        FPS  Q = (*this) / D,   R = Q * D;
+        Poly  Q = (*this) / D,   R = Q * D;
         int  n = D.size(),  j = -1;
         for( int i=0 ; i<n-1 ; ++i )  {
             R[i] = a[i] - R[i];
@@ -275,7 +274,7 @@ class FormalPowerSeries
         return  ret;
     }
 
-    void ntt( bool inverse )  {
+    void  ntt( bool inverse )  {
         static bool  first = true;
         static T  dw[30], idw[30];
         if( first )  {
@@ -300,7 +299,7 @@ class FormalPowerSeries
                     w *= dw[__builtin_ctz( ++k )];
                 }
             }
-        } else {
+        } else  {
             for( size_t m=1 ; m<n ; m*=2 )  {
                 T  w = 1;
                 for( size_t s=0, k=0 ; s<n ; s+=2*m )  {
@@ -528,7 +527,7 @@ class FormalPowerSeries
 
   private:   // FOR MULTIPOINT EVALUATION AND POLYNOMIAL INTERPOLATION
     // BUILDS SEGMENT TREE  T  FOR  prod( x - pts[i]
-	// REF:  https://cp-algorithms.com/algebra/polynomial.html
+    // REF:  https://cp-algorithms.com/algebra/polynomial.html
     void  subprodTree( VPoly &tree, size_t rt, size_t l, size_t r )
     {
         if( l + 1 == r )  {
@@ -610,12 +609,12 @@ class FormalPowerSeries
     FPS  interpolate( const FPS &b ) { return  FPS( *this ).interpolate_IP( b ); }
 
   private:  // FOR k-th TERM OF LINEAR RECURRENCE - BOSTAN-MORI ALGORITHM
-    friend void  half( FPS &A, bool odd )  {
+    friend void  half( Poly &A, bool odd )  {
         for( size_t i=odd ; i<A.size() ; i+=2 )   A[i >> 1] = A[i];
         A.resize( ( A.size() + !odd ) / 2 );
     }
 
-    friend T  fps_kth_term( FPS &p, FPS &q, i64 k )  {
+    friend T  fps_kth_term( Poly &p, Poly &q, i64 k )  {
     	const size_t  sz = q.size();
         FPS  qneg;
         while( k > 0 )  {
@@ -633,7 +632,7 @@ class FormalPowerSeries
       //  V = ( V[0], ..., V[m-1] )
 	  //  RECURRENCE IS:
       //    V[i] = C[0]*V[i-1] + C[1]*V[i-2] + ... + C[m-1]*V[i-m]
-    friend T  kth_term( const FPS &C, const FPS &V, i64 k )  {
+    friend T  kth_term( const Poly &C, const Poly &V, i64 k )  {
     	const size_t  sz = C.size();
         FPS  q( sz + 1 );
         q[0] = 1;
@@ -653,22 +652,20 @@ class FormalPowerSeries
     }
 
     vector<T>  findRoots()  {
-        FPS  x = { 0, 1 };
-        FPS  p = x.modPow( T::get_mod(), *this );
+        Poly  x = { 0, 1 };
+        Poly  p = x.modPow( T::get_mod(), *this );
         if( p.size() < 2 )   p.resize( 2 );
         p.a[1] -= 1;
-        FPS  q = p.polyGCD( *this );
+        Poly  q = p.polyGCD( *this );
         vector<T>  ans;
         q.findRootsDFS( ans );
         return  ans;
     }
 
-//  *********** VERIFIED TO HERE ************
-
-    FPS  modPow( u64 k, FPS g )  {  // this ^k mod g
+    Poly  modPow( u64 k, Poly g )  {  // this ^k mod g
         assert( g.size() );
         auto  inv = g.rev().inverse();
-        FPS   res{ 1 },  b( *this );
+        Poly  res{ 1 },  b( *this );
         while( k )  {
             if( k & 1 )  {
                 res *= b;   res -= res/g * g;
@@ -797,17 +794,15 @@ int  main()  {
     ios_base::sync_with_stdio( false );
     cin.tie( NULL );
 
-    int N;
-    cin >> N;
+    size_t  n, m;  cin >> n >> m;
+    FPS  f( n ), g( m );
 
-    FPS f( N + 1 );
-    cin >> f;
+    cin >> f >> g;
 
-    auto  a = f.findRoots();
+    auto  ans = f.divmod( g );
 
-    cout << a.size() << '\n';
-    for( auto &x : a )  cout << x.get() << ' ';
-    cout << '\n';
+    cout << ans.first.size() << " " << ans.second.size() << '\n';
+    cout << ans.first  << '\n' << ans.second << '\n';
 
-    return  0;
+    return 0;
 }
