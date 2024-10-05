@@ -547,6 +547,52 @@ class FormalPowerSeries
         return  f;
     }
 
+   Poly  interpolateEval( const T &c, const int &m )  {
+        int  n = size();
+        Poly  ifact( n );
+        ifact[n - 1] = 1;
+        for ( int i=1 ; i<n ; ++i )  ifact[n - 1] *= i;
+        ifact[n - 1] = T( 1 ) / ifact[n - 1];
+        for( int i= n-1 ; i>0 ; --i )  ifact[i - 1] = ifact[i] * i;
+
+        Poly  f( n );
+        for( int i=0 ; i<n ; ++i )  {
+            if( ( n - 1 - i ) & 1 )
+                f[i] = -(*this)[i] * ifact[i] * ifact[n - 1 - i];
+            else
+                f[i] =  (*this)[i] * ifact[i] * ifact[n - 1 - i];
+        }
+
+        Poly  p( n + m, 1 ),  ip( n + m );
+        for( int i=1 ; i<n+m ; ++i )  {
+            if( c - n + i == 0 )
+                p[i] = p[i - 1];
+            else
+                p[i] = p[i - 1] * ( c - n + i );
+        }
+
+        ip[n + m - 1] = T(1) / p[n + m - 1];
+        for( int i=n+m-1 ; i>0 ; --i )  {
+            if( c - n + i == 0 )
+                ip[i - 1] = ip[i];
+            else
+                ip[i - 1] = ip[i] * ( c - n + i );
+        }
+        Poly  g( n + m - 1 );
+        for( int i=0 ; i<n+m-1 ; ++i )  g[i] = p[i] * ip[i + 1];
+        f *= g;
+
+        Poly  ans( m );
+        for( int i=0 ; i<m ; ++i )  {
+            int  x = ( c + i ).get();
+            if( x < n )
+                ans[i] = (*this)[x];
+            else
+                ans[i] = f[n - 1 + i] * p[n + i] * ip[i];
+        }
+        return  ans;
+    }
+
   private:   // FOR MULTIPOINT EVALUATION AND POLYNOMIAL INTERPOLATION
     // BUILDS SEGMENT TREE  T  FOR  prod( x - pts[i]
 	// REF:  https://cp-algorithms.com/algebra/polynomial.html
@@ -636,7 +682,7 @@ class FormalPowerSeries
         A.resize( ( A.size() + !odd ) / 2 );
     }
 
-    friend T  fps_kth_term( Poly &p, Poly &q, i64 k )  {
+    friend T  recur_kth_term( Poly &p, Poly &q, i64 k )  {
     	const size_t  sz = q.size();
         FPS  qneg;
         while( k > 0 )  {
@@ -816,12 +862,13 @@ int  main()  {
     ios_base::sync_with_stdio( false );
     cin.tie( NULL );
 
-    size_t  n, c;
-    cin >> n >> c;
-    FPS  x( n );
+    int N, M, c;
+
+    cin >> N >> M >> c;
+
+    FPS  x( N );
     cin >> x;
 
-    cout << x.taylor_shift( c ) << '\n';
-
-    return 0;
+    FPS ans = x.interpolateEval( c, M );
+    cout << ans << '\n';
 }
