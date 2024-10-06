@@ -322,9 +322,8 @@ class FormalPowerSeriesArb : public FormalPowerSeries<T>
     using  u32 = uint32_t;   using  u64 = uint64_t;
 
     // CLASS DATA
-    static constexpr u32  M1 = 962592769, M2 = 975175681, M3 = 976224257,
-                          M4 = 985661441, M5 = 998244353;
-    static constexpr const array<u32, 5>  mods{ M1, M2, M3, M4, M5 };
+    static constexpr u32  M1 = 962592769, M2 = 975175681, M3 = 976224257;
+    static constexpr const array<u32, 3>  mods{ M1, M2, M3 };
     inline static  vector<vector<u32>>    garConst;
     inline static  vector<u32>            garInv;
     inline static u32                     MOD;
@@ -372,6 +371,26 @@ class FormalPowerSeriesArb : public FormalPowerSeries<T>
         }
         convolve_inplace( b );
         return  (*this);
+    }
+
+    FPSA  inverse( int dgr = -1 ) const  {
+        size_t  n = this->size();
+        assert( n != 0  &&  (*this).a[0] != 0 );
+        size_t  deg = ( dgr == -1 ) ? n : size_t( dgr );
+        FPSA  r( { T( 1 ) / (*this).a[0] } );
+
+        for( size_t m=1 ; m<deg ; m*=2 )  {
+            size_t  twoM = m << 1;
+            FPSA  f( { (*this).a.begin(), (*this).a.begin() + min( n, twoM ) } );
+            FPSA  g( r );
+            f *= g;
+            f.a.erase( f.a.begin(), f.a.begin() + m );
+            f.resize( twoM );
+            f *= g;
+            for( size_t i=0 ; i<twoM ; ++i )  f[i] = -f[i];
+            r.a.insert( r.a.end(), f.a.begin(), f.a.begin() + m );
+        }
+        return  FPSA( { r.a.begin(), r.a.begin() + min( max( deg, size_t( 1 ) ), r.size() ) } );
     }
 
   private:
@@ -441,22 +460,17 @@ class FormalPowerSeriesArb : public FormalPowerSeries<T>
 };
 
 
-int main()
-{
+int  main()  {
     ios_base::sync_with_stdio( false );
     cin.tie( NULL );
 
-    int N, M;
-    cin >> N >> M;
+    size_t  n;
+    cin >> n;
 
-    FormalPowerSeriesArb< Mint<1000000007> >  x( N ),  y( M );
-    cin >> x >> y;
+    FormalPowerSeriesArb< Mint<998244353> >  x( n );
+    cin >> x;
 
-    cout << x * y << '\n';
-
-//    auto  a1 = y / x;
-//    auto  a2 = y % x;
-//    cout << a1 * x + a2 << '\n';
+    cout << x.inverse() << '\n';
 
     return  0;
 }
