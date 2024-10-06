@@ -1,12 +1,9 @@
-// SOLVES CONVOLUTION MOD 1000000007
-// https://judge.yosupo.jp/problem/convolution_mod_1000000007
-
-#include <cstdint>
 #include <iostream>
 #include <vector>
 #include <algorithm>
 #include <array>
 #include <cassert>
+#include <random>
 using namespace std;
 
 using  u64 = uint64_t;
@@ -88,6 +85,27 @@ class  Mint
     constexpr bool operator != (const Mint &b) const  {
         return ( a >= mod ? a - mod : a ) != ( b.a >= mod ? b.a - mod : b.a );
     }
+    int  legendre()  { return  pow( ( mod - 1 ) >> 1 ).get(); }
+    int  tonelli()  {  // RETURNS -1 IF NO INV, ELSE CAST TO Mint
+        if( a == 0 )            return   0;
+        if( legendre() != 1 )   return  -1;
+        int  s = 0,  q = mod - 1;
+        while( q %2 == 0 )  { q >>= 1;  ++s; }
+        if( s == 1 )   return  pow( (mod + 1)>>2 ).get();
+        Mint  z = 2,  val = mod - 1;
+        for( ; z != Mint( 0 ) ; ++z )
+            if( val == z.legendre() )   break;
+        Mint  c = z.pow( q );    Mint  r = pow( ( q + 1 ) >> 1 );
+        Mint  t = pow( q );         int  m = s;
+        while( t.get() != 1 )  {
+            z = t*t;   int  i = 1;
+            for( ; i<s ; ++i )  {
+                if( z.get() == 1 )    break;
+                z *= z; }
+            auto  b = c.pow( 1 << (m - i - 1) );
+            r *= b;  c = b*b;  t *= c;  m = i; }
+        return  min( r.get(), mod - r.get() );
+    }
 
     // INPUT AND OUTPUT
     friend ostream &operator << ( ostream &os, const Mint &b )  {
@@ -103,14 +121,14 @@ class  Mint
 template < typename T >
 class FormalPowerSeries
 {
-  public:
-    using  i64 = int64_t;
-    using  FPS = FormalPowerSeries<T>;
+    using  i64   = int64_t;
+    using  FPS   = FormalPowerSeries<T>;
+    using  VPoly = vector<FPS>;
+    using  Poly  = FormalPowerSeries<T>;
 
-    // CLASS DATA
+  public:
     vector<T>  a;
 
-  public:
     // CONSTRUCTORS
     constexpr FormalPowerSeries( size_t sz = 0 )  { a.resize( sz, 0 ); }
     constexpr FormalPowerSeries( const initializer_list<T>  v )  { a = v; }
@@ -119,17 +137,12 @@ class FormalPowerSeries
     constexpr size_t  size() const { return a.size(); }
     void  resize( size_t sz, T m = 0 )  { (*this).a.resize( sz, m ); }
 
-    T  &operator [] ( size_t  x )  {
-        assert( x < this->a.size() );
-        return  a[x];
-    }
-    constexpr T  operator [] ( size_t  x ) const {
-        assert( x < this->a.size() );
-        return  a[x];
-    }
+    T &operator [] ( size_t  x ) { assert( x < this->a.size() );  return  a[x]; }
+    constexpr T operator [] ( size_t  x ) const { assert( x < this->a.size() );  return  a[x]; }
 
     // INPUT AND OUTPUT
     friend std::ostream &operator << ( std::ostream &os, const FPS &p )  {
+        if( p.size()== 0 )  { os << " ";  return  os; }
         for( auto &v : p.a )   os << v << " ";
         return  os;
     }
@@ -144,10 +157,8 @@ class FormalPowerSeries
     constexpr FPS  operator * ( const FPS &a ) const { return  FPS(*this) *= a; }
     constexpr FPS  operator / ( const FPS &a ) const { return  FPS(*this) /= a; }
     constexpr FPS  operator % ( const FPS &a ) const { return  FPS(*this) %= a; }
-    FPS  &operator = ( const FPS &r )  {
-        this->a = r.a;
-        return  *this;
-    }
+
+    FPS  &operator  = ( const FPS &r )  { this->a = r.a;  return  *this; }
     FPS  &operator += ( const FPS &r )  {
         this->resize( max( this->size(), r.size() ) );
         for( size_t i=0 ; i<r.size() ; ++i )  this->a[i] += r.a[i];
@@ -159,6 +170,10 @@ class FormalPowerSeries
         return  *this;
     }
     FPS  &operator *= ( const i64 v )  {
+        for( size_t i=0 ; i<this->size() ; ++i )  this->a[i] *= v;
+        return  *this;
+    }
+    FPS  &operator *= ( const T &v )  {
         for( size_t i=0 ; i<this->size() ; ++i )  this->a[i] *= v;
         return  *this;
     }
@@ -188,15 +203,15 @@ class FormalPowerSeries
         return *this = ( (*this).rev().low( n ) * r.rev().inverse( n ) ).low( n ).rev();
     }
 
-    FPS  &operator %= ( const FPS &P )  {
+    Poly  &operator %= ( const Poly &P )  {
         if( P.size() > size() )  return *this;
-        auto [ _, r ] = divmod( P );
-        return  r;
+        auto [ _, r ] = (*this).divmod( P );
+        return  (*this) = r;
     }
 
-    pair<FPS, FPS>  divmod( const FPS &D )  {
+    pair<Poly, Poly>  divmod( const Poly &D )  {
         if( D.size() > this->size() )  return { {},*this };
-        FPS  Q = (*this) / D,   R = Q * D;
+        Poly  Q = (*this) / D,   R = Q * D;
         int  n = D.size(),  j = -1;
         for( int i=0 ; i<n-1 ; ++i )  {
             R[i] = a[i] - R[i];
@@ -259,7 +274,7 @@ class FormalPowerSeries
         return  ret;
     }
 
-    void ntt( bool inverse )  {
+    void  ntt( bool inverse )  {
         static bool  first = true;
         static T  dw[30], idw[30];
         if( first )  {
@@ -284,7 +299,7 @@ class FormalPowerSeries
                     w *= dw[__builtin_ctz( ++k )];
                 }
             }
-        } else {
+        } else  {
             for( size_t m=1 ; m<n ; m*=2 )  {
                 T  w = 1;
                 for( size_t s=0, k=0 ; s<n ; s+=2*m )  {
@@ -311,6 +326,530 @@ class FormalPowerSeries
         for( size_t i=0 ; i<sz ; ++i )   a[i] *= b[i];
         ntt( true );  resize( n + m - 1 );
         return  *this;
+    }
+
+  private:  // USED BY SQRT
+    void  prepSqrt()  {
+        size_t  n = a.size();
+        FPS  rt( { 1 } );
+        T  inv = ( T::get_mod() + 1 ) >> 1;
+        while( rt.size() < n )  {
+            FPS  f( { a.begin(), a.begin() + min( n, rt.size() << 1 ) } );
+            FPS  sv = rt;
+            rt.resize( rt.size() << 1 );
+            f *= rt.inverse();    f += sv;
+            for( size_t i=rt.size() >> 1 ; i<rt.size() ; ++i )   rt[i] = f[i]*inv;
+        }
+        rt.resize( n );
+        a = rt.a;
+    }
+
+  public:
+  // SQRT(f(x)) - EMPTY IF NO SQRT.  MAY NEED TO RESIZE RESULT.
+    FPS&  sqrt_inplace()  {
+        size_t  n = a.size(),   zeros = 0;
+        reverse( a.begin(), a.end() );
+        while( !a.empty()  &&  a.back() == 0 )  a.pop_back(), ++zeros;
+        if( a.empty() )    return  *this = FPS( n );
+        if( zeros & 1 )    return  *this = FPS( 0 );
+        reverse( a.begin(), a.end() );
+        int  irt = a[0].tonelli();
+        if( irt == -1 )    return  *this = FPS( 0 );
+        zeros >>= 1;
+        a.insert( a.end(), zeros, 0 );
+        *this *= a[0].inverse();
+        prepSqrt();
+        *this *= irt;
+        a.insert( a.begin(), zeros, 0 );
+        a.resize( n );
+        return  *this;
+    }
+    FPS  sqrt() const { return FPS( *this ).sqrt_inplace(); }
+
+    FPS&  differential_inplace()  {
+        const size_t  n = this->a.size();
+        assert( n > 0 );
+        for( size_t i=1 ; i<n ; ++i )   a[i-1] = a[i] * i;
+        a[n-1] = 0;
+        return  *this;
+    }
+    FPS  differential() const { return  FPS( *this ).differential_inplace(); }
+
+    FPS&  integral_inplace() {
+        const size_t  n = this->a.size();
+        assert( n > 0 );
+        this->a.insert( this->a.begin(), 0 );
+        vector<T>  inv( n + 1 );   inv[1] = 1;
+        unsigned  mod = T::get_mod();
+        for( size_t i=2 ; i<=n ; ++i )  inv[i] = -inv[mod %i]*( mod/i );
+        for( size_t i=2 ; i<=n ; ++i )  this->a[i] *= inv[i];
+        return  *this;
+    }
+    FPS  integral() const { return FPS( *this ).integral_inplace(); }
+
+    FPS&  exp_inplace( int deg = -1 )  {
+        size_t  n = this->size();
+        assert( n > 0  &&  a[0] == 0 );
+        if( deg == -1 )  deg = int( n );
+        FPS  g( { 1 } ),  g_fft;
+        this->resize( deg );
+        this->a[0] = 1;
+        FPS  h_drv = this->differential();
+        for( size_t m=1 ; m<size_t( deg ) ; m*=2 )  {
+            FPS  f_fft( { a.begin(), a.begin() + m } );
+            f_fft.resize( 2*m ), f_fft.ntt( false );
+
+            if( m > 1 )  {
+                FPS  _f( m );
+                for( size_t i=0 ; i<m ; ++i )  _f[i] = f_fft[i] * g_fft[i];
+                _f.ntt( true );
+                _f.a.erase( _f.a.begin(), _f.a.begin() + m/2 );
+                _f.resize( m ),  _f.ntt( false );
+                for( size_t i=0 ; i<m ; ++i )  _f[i] *= g_fft[i];
+                _f.ntt( true );
+                _f.resize( m/2 );
+                for( size_t i=0 ; i<m/2 ; ++i )  _f[i] = -_f[i];
+                g.a.insert( g.a.end(), _f.a.begin(), _f.a.begin() + m/2 );
+            }
+
+            FPS  t( { a.begin(), a.begin() + m } );
+            t.differential_inplace();
+            {
+                FPS  r( { h_drv.a.begin(), h_drv.a.begin() + m - 1 } );
+                r.resize( m );  r.ntt( false );
+                for( size_t i=0 ; i<m ; ++i )  r[i] *= f_fft[i];
+                r.ntt( true );
+                t -= r;
+                t.a.insert( t.a.begin(), t.a.back() );  t.a.pop_back();
+            }
+
+            t.resize( 2*m );  t.ntt( false );
+            g_fft = g;  g_fft.resize( 2*m );  g_fft.ntt( false );
+            for( size_t i=0 ; i<2*m ; ++i )  t[i] *= g_fft[i];
+            t.ntt( true );
+            t.resize( m );
+
+            FPS  v( { a.begin() + m, a.begin() + min( deg, int( 2*m ) ) } );
+            v.resize( m );
+            t.a.insert( t.a.begin(), m-1, 0 );  t.a.push_back( 0 );
+
+            t.integral_inplace();
+
+            for( size_t i=0 ; i<m ; ++i )    v[i] -= t[m+i];
+            v.resize( 2*m );  v.ntt( false );
+            for( size_t i=0 ; i<2*m ; ++i )  v[i] *= f_fft[i];
+            v.ntt( true );
+            v.resize( m );
+
+            for( size_t i=0 ; i<min( deg-m, m ) ; ++i )  a[m+i] = v[i];
+        }
+        return  *this;
+    }
+    FPS  exp( const int deg = -1 ) const { return  FPS( *this ).exp_inplace( deg ); }
+
+    FPS&  log_inplace( int deg = -1 )  {
+        size_t  n = this->size();
+        assert( n > 0  &&  this->a[0] == 1 );
+        if( deg == -1 )  deg = n;
+        if( size_t( deg ) < n )    this->resize( deg );
+        FPS  f_inv = this->inverse();
+        this->differential_inplace();
+        *this *= f_inv;
+        this->resize( deg );
+        this->integral_inplace();
+        this->resize( deg );
+        return  *this;
+    }
+    FPS  log( const int deg = -1 ) const { return FPS( *this ).log_inplace( deg ); }
+
+    FPS&  pow_inplace( int64_t k )  {
+        int64_t  deg = this->size();
+        if( k == 0 )  {
+            this->a.assign( deg, 0 );
+            this->a[0] = 1;
+            return  *this;
+        }
+
+        int64_t  l = 0;
+        while( this->a[l] == 0 )   ++l;
+        if( l >= (deg-1)/k + 1 )   return  *this = FPS( deg );
+        T  ic = a[l].inverse();
+        T  pc = a[l].pow( k );
+        a.erase( a.begin(), a.begin() + l );
+        *this *= ic.get();
+        this->log_inplace();
+        *this *= k;
+        this->exp_inplace();
+        *this *= pc.get();
+        this->a.insert( this->a.begin(), l*k, 0 );
+        this->resize( deg );
+        return  *this;
+    }
+    FPS  pow( int64_t k ) const { return FPS(*this).pow_inplace( k ); }
+
+    // f(g(x))
+    FPS&  composition_inplace( const FPS &P )  {
+        size_t  n = P.size();
+        assert( n == size() );
+        size_t  k = 1;
+        while( uint64_t( k )*k < n )   ++k;
+
+        VPoly  pow1( k + 1 );
+        pow1[0] = { 1 };    pow1[1] = P;
+        for( size_t i=2 ; i<=k ; ++i )  {
+            pow1[i] = pow1[i-1] * pow1[1];
+            pow1[i].resize( n );
+        }
+        VPoly  pow2( k + 1 );
+        pow2[0] = { 1 };    pow2[1] = pow1[k];
+        for( size_t i=2 ; i<=k ; ++i )  {
+            pow2[i] = pow2[i-1] * pow2[1];
+            pow2[i].resize( n );
+        }
+        FPS  ans( n );
+        for( size_t i=0 ; i<=k ; ++i )  {
+            FPS  f( n );
+            for( size_t j=0 ; j<k ; ++j )  {
+                if( k*i + j < n )  {
+                    T coef = a[k*i + j];
+                    for( size_t d=0 ; d<pow1[j].size() ; ++d )
+                        f[d] += pow1[j][d]*coef;
+                }
+            }
+            f *= pow2[i];
+            f.resize( n );
+            for( size_t j=0 ; j<n ; ++j )  ans[j] += f[j];
+        }
+        a = ans.a;
+        return  *this;
+    }
+    FPS  composition( const FPS &P ) { return FPS(*this).composition_inplace( P ); }
+
+    FPS  taylor_shift( T c )  {
+        if( c == 0 )  return  *this;
+        size_t  n = size();
+        FPS     f( n ), g( n );
+        FPS     fact( n ),  ifact( n );   fact[0] = 1;
+        T       pow_c = 1;
+
+        for( size_t i=1 ; i<n ; ++i )     fact[i] = fact[i-1] * i;
+        ifact[n-1] = fact[n-1].inverse();
+        for( size_t i=n-1 ; i>0 ; --i )   ifact[i-1] = T( i ) * ifact[i];
+
+        for( size_t i=0 ; i<n ; ++i )  {
+            f[i]     = fact[i] * (*this)[i];
+            g[n-1-i] = pow_c * ifact[i];
+            pow_c *= c;
+        }
+
+        FPS  h = f * g;
+        for( size_t i=0 ; i<n ; ++i )  f[i] = h[n+i-1] * ifact[i];
+        return  f;
+    }
+
+   Poly  interpolateEval( const T &c, const int &m )  {
+        int  n = size();
+        Poly  ifact( n );
+        ifact[n - 1] = 1;
+        for ( int i=1 ; i<n ; ++i )  ifact[n - 1] *= i;
+        ifact[n - 1] = T( 1 ) / ifact[n - 1];
+        for( int i= n-1 ; i>0 ; --i )  ifact[i - 1] = ifact[i] * i;
+
+        Poly  f( n );
+        for( int i=0 ; i<n ; ++i )  {
+            if( ( n - 1 - i ) & 1 )
+                f[i] = -(*this)[i] * ifact[i] * ifact[n - 1 - i];
+            else
+                f[i] =  (*this)[i] * ifact[i] * ifact[n - 1 - i];
+        }
+
+        Poly  p( n + m, 1 ),  ip( n + m );
+        for( int i=1 ; i<n+m ; ++i )  {
+            if( c - n + i == 0 )
+                p[i] = p[i - 1];
+            else
+                p[i] = p[i - 1] * ( c - n + i );
+        }
+
+        ip[n + m - 1] = T(1) / p[n + m - 1];
+        for( int i=n+m-1 ; i>0 ; --i )  {
+            if( c - n + i == 0 )
+                ip[i - 1] = ip[i];
+            else
+                ip[i - 1] = ip[i] * ( c - n + i );
+        }
+        Poly  g( n + m - 1 );
+        for( int i=0 ; i<n+m-1 ; ++i )  g[i] = p[i] * ip[i + 1];
+        f *= g;
+
+        Poly  ans( m );
+        for( int i=0 ; i<m ; ++i )  {
+            int  x = ( c + i ).get();
+            if( x < n )
+                ans[i] = (*this)[x];
+            else
+                ans[i] = f[n - 1 + i] * p[n + i] * ip[i];
+        }
+        return  ans;
+    }
+
+  private:   // FOR MULTIPOINT EVALUATION AND POLYNOMIAL INTERPOLATION
+    // BUILDS SEGMENT TREE  T  FOR  prod( x - pts[i]
+	// REF:  https://cp-algorithms.com/algebra/polynomial.html
+    void  subprodTree( VPoly &tree, size_t rt, size_t l, size_t r )
+    {
+        if( l + 1 == r )  {
+            tree[rt] = { (*this)[l] == 0 ? 0 : -(*this)[l], 1 };
+            return;
+        }
+
+        size_t  lKid = 2*rt,  rKid = lKid + 1,  mid  = ( l + r ) >> 1;
+        subprodTree( tree, lKid, l, mid );
+        subprodTree( tree, rKid, mid, r );
+        tree[rt] = tree[lKid] * tree[rKid];
+    }
+
+    // QUERIES SEGMENT TREE tree TO EVALUATE p AT VALS IN pts.
+    // STORES ANSWERS IN pts.
+    void  multiPtEvaluation( const VPoly &tree, size_t rt, size_t l,
+                             size_t r, FPS &p )  {
+        if( l + 1 == r )  { (*this)[l] = p.size() == 0 ? 0 : p[0];  return; }
+
+        size_t  lKid = 2*rt,  rKid = lKid + 1,  mid  = ( l + r ) >> 1;
+
+        FPS  A = p % tree[lKid];
+        multiPtEvaluation( tree, lKid, l, mid, A );
+        A = p % tree[rKid];
+        multiPtEvaluation( tree, rKid, mid, r, A );
+    }
+
+    FPS  interp( const VPoly &tree, size_t rt, size_t l, size_t r )
+    {
+        if( l + 1 == r )   return { (*this)[l] };
+
+        size_t  lKid = 2*rt,   rKid = lKid + 1,   m = ( l + r ) >> 1;
+
+        return  tree[rKid] * interp( tree, lKid, l, m ) +
+                tree[lKid] * interp( tree, rKid, m, r );
+    }
+
+  public:
+    // OVERWRITES pts WITH p EVALUATED AT pts
+    FPS  multiPtEvaluation_IP( FPS& pts )
+    {
+        size_t  nSave = pts.size();
+        if( size() == 0 )   return  FPS( nSave );
+        pts.resize( max( size(), pts.size() ) );
+        size_t  n = pts.size();
+
+        // BUILD SEGMENT TREE FOR PRODUCTS
+        VPoly  tree( n*4, FPS() );
+        pts.subprodTree( tree, 1, 0, n );
+
+        // QUERY SEGMENT TREE tree TO EVALUATE p AT pts
+        pts.multiPtEvaluation( tree, 1, 0, n, (*this) );
+        pts.resize( nSave );
+        return  pts;
+    }
+    FPS  multiPtEvaluation( FPS &b ) {  FPS  tmp( b );
+        return  (*this).multiPtEvaluation_IP( tmp ); }
+
+    // GIVEN  n  ORDERED PAIRS ( a[i], b[i] ),  FIT A DEGREE n-1
+    // POLYNOMIAL  f  SO THAT  f( a[i] ) %MOD = b[i]  FOR ALL i.
+    FPS  interpolate_IP( const FPS &b )
+    {
+        size_t  n = b.size();
+        assert( n == size() );
+
+        VPoly  tree( 4*n, FPS() );
+        (*this).subprodTree( tree, 1, 0, n );
+
+        FPS  d = tree[1].differential();
+        (*this).multiPtEvaluation( tree, 1, 0, n, d );
+
+        for( size_t i=0 ; i<size() ; ++i )   (*this)[i] = b[i] / (*this)[i];
+
+        (*this) = (*this).interp( tree, 1, 0, n );
+
+        (*this).resize( n );
+        return  *this;
+    }
+    FPS  interpolate( const FPS &b ) { return  FPS( *this ).interpolate_IP( b ); }
+
+  private:  // FOR k-th TERM OF LINEAR RECURRENCE - BOSTAN-MORI ALGORITHM
+    friend void  half( Poly &A, bool odd )  {
+        for( size_t i=odd ; i<A.size() ; i+=2 )   A[i >> 1] = A[i];
+        A.resize( ( A.size() + !odd ) / 2 );
+    }
+
+    friend T  recur_kth_term( Poly &p, Poly &q, i64 k )  {
+    	const size_t  sz = q.size();
+        FPS  qneg;
+        while( k > 0 )  {
+        	qneg = q;
+            for( size_t i=1 ; i<sz ; i+=2 )  qneg[i] = -qneg[i];
+            p *= qneg;         q *= qneg;
+            half( p,  k % 2 );  half( q, false );
+            k >>= 1;
+        }
+        return  p[0] / q[0];
+    }
+
+  public:
+      //  C = ( C[0], ..., C[m-1] )
+      //  V = ( V[0], ..., V[m-1] )
+	  //  RECURRENCE IS:
+      //    V[i] = C[0]*V[i-1] + C[1]*V[i-2] + ... + C[m-1]*V[i-m]
+    friend T  kth_term( const Poly &C, const Poly &V, i64 k )  {
+    	const size_t  sz = C.size();
+        FPS  q( sz + 1 );
+        q[0] = 1;
+        for( size_t i=0 ; i<sz ; ++i )   q[i + 1] = -C[i];
+        FPS  p = V * q;
+        p.resize( sz );
+        return  fps_kth_term( p, q, k );
+    }
+
+    T  evaluate( i64 x )  {
+        T  ans = 0,  powx = 1;
+        for( auto &v : a )  {
+            ans += v*powx;
+            powx *= x;
+       }
+       return  ans;
+    }
+
+    vector<T>  findRoots()  {
+        Poly  x = { 0, 1 };
+        Poly  p = x.modPow( T::get_mod(), *this );
+        if( p.size() < 2 )   p.resize( 2 );
+        p.a[1] -= 1;
+        Poly  q = p.polyGCD( *this );
+        vector<T>  ans;
+        q.findRootsDFS( ans );
+        return  ans;
+    }
+
+    Poly  modPow( u64 k, Poly g )  {  // this ^k mod g
+        assert( g.size() );
+        auto  inv = g.rev().inverse();
+        Poly  res{ 1 },  b( *this );
+        while( k )  {
+            if( k & 1 )  {
+                res *= b;   res -= res/g * g;
+                res.shrink();
+            }
+            b *= b;   b -= b/g * g;
+            b.shrink();
+            k >>= 1;
+        }
+        return  res;
+    }
+
+  private:  // THIS STUFF IS FOR POLYNOMIAL INVERSE
+    using  Arr = array<FPS, 2>;
+    using  Mat = array<Arr, 2>;
+
+    VPoly  cut( VPoly a, int k )  {
+        for( size_t i=0 ; i<2 ; ++i )   a[i] = a[i].shift( -k );
+        return a;
+    }
+    friend Mat  operator * ( const Mat& a, const Mat& b )  {
+        Mat  res;
+        for( size_t i=0 ; i<2 ; ++i )
+            for( size_t j=0 ; j<2 ; ++j )
+                for( size_t k=0 ; k<2 ; ++k )
+                    res[i][k] += a[i][j] * b[j][k];
+        return res;
+    }
+    friend VPoly  operator * ( const Mat& A, const VPoly& b )  {
+        VPoly  ret( 2 );
+        for( int i=0 ; i<2 ; ++i )  {
+            FPS  tmp = A[i][0] * b[0] + A[i][1] * b[1];
+            tmp.shrink();
+            ret[i] = tmp;
+        }
+        return ret;
+    }
+    Mat  getID()  {
+        FPS  zro = FPS( { 0 } ),  one = FPS( { 1 } );
+        Mat  ID  = { Arr{ one, zro }, Arr{ zro, one } };
+        return  ID;
+	}
+    void  step( Mat& m, VPoly& A )  {
+        auto [q, r] = A[0].divmod( A[1] );
+        r.shrink();
+        A = { A[1], r };
+        FPS  temp1 = m[0][0] - q * m[1][0];  temp1.shrink();
+        FPS  temp2 = m[0][1] - q * m[1][1];  temp2.shrink();
+        m = { m[1], { temp1, temp2 } };
+    }
+
+    Mat  hGCD( VPoly A )  {
+        size_t  sz = A[0].size()/2;
+        if( A[1].size() <= sz )   return  getID();
+        Mat  R = hGCD( cut( A, sz ) );    A = R * A;
+        if( A[1].size() <= sz )   return  R;
+        step( R, A );
+        if( A[1].size() <= sz )   return  R;
+        int  k = 2*sz + 1 - (int)A[0].size();
+        return  hGCD( cut( A, k ) ) * R;
+    }
+
+    Mat  euclid( VPoly A )  {
+        Mat  mat = hGCD( A );   A = mat * A;
+        if( !A[1].size() )   return  mat;
+        step( mat, A );
+        if( !A[1].size() )   return  mat;
+        return  euclid( A ) * mat;
+    }
+
+  public:
+    FPS  polyGCD( const FPS &b )  {
+        Mat  mat = getID();
+        VPoly  A = { *this, b };
+        step( mat, A );
+        if( A[1].size() )   mat = euclid( A )* mat;
+        FPS  gcd = mat[0][0] * (*this) + mat[0][1] * b;
+        gcd.shrink();
+        return  gcd;
+    }
+
+    // REF:  https://math.stackexchange.com/questions/124300/
+    //       finding-inverse-of-polynomial-in-a-field
+    //  RETURNS  INVERSE OF (*this) MOD  b
+    //  IFF NO INVERSE EXITS, RETURNS ans WITH size > size of b
+    FPS  polyInverse( const FPS &b )  {
+        Mat  mat = getID();
+        VPoly  A = { *this, b };
+        step( mat, A );
+        if( A[1].size() )   mat = euclid( A ) * mat;
+        FPS  gcd = mat[0][0] * (*this) + mat[0][1] * b;
+        gcd.shrink();
+        if( gcd.size() != 1 )   return  FPS( b.size() + 1 );
+        size_t  sz = mat[0][0].size();
+        FPS  ans( sz );
+        T  v = gcd[0].inverse();
+        for( size_t i=0 ; i<sz ; ++i )   ans[i] = mat[0][0][i] * v;
+        ans.shrink();
+        return  ans;
+    }
+
+  private:
+    void  findRootsDFS( vector<T> &roots )  {
+        static std::mt19937  rng{ 0 };
+        if( size() == 1 )  return;
+        if( size() == 2 )  {
+            roots.push_back( -a[0] / a[1] );
+            return;
+        }
+        FPS  u { T( rng() ), T( 1 ) };
+        FPS  v = u.modPow( ( T::get_mod() - 1 )/2, *this );
+        --v[0];
+        FPS  g = v.polyGCD( *this );
+        g.findRootsDFS( roots );
+        FPS  Q = (*this) / g;
+        Q.findRootsDFS( roots );
     }
 };
 
@@ -459,6 +998,8 @@ class FormalPowerSeriesArb : public FormalPowerSeries<T>
     }
 };
 
+using  FPSA = FormalPowerSeriesArb< Mint<998244353> >;
+
 
 int  main()  {
     ios_base::sync_with_stdio( false );
@@ -467,10 +1008,18 @@ int  main()  {
     size_t  n;
     cin >> n;
 
-    FormalPowerSeriesArb< Mint<998244353> >  x( n );
+    FPSA  x( n );
     cin >> x;
 
-    cout << x.inverse() << '\n';
+    auto  ans = x.sqrt();
+
+    if( ans.size() )   cout << ans;
+    else               cout << "-1";
+    cout << '\n';
+
+    ans *= x;
+
+    cout << ans << endl;
 
     return  0;
 }
