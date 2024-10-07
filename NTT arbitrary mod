@@ -835,6 +835,12 @@ class FormalPowerSeries
         return  ans;
     }
 
+    FPS  pre( size_t sz ) const  {
+        FPS  r( *this );
+        r.a.resize( min( this->size(), sz ) );
+        return  r;
+    }
+
   private:
     void  findRootsDFS( vector<T> &roots )  {
         static std::mt19937  rng{ 0 };
@@ -897,6 +903,7 @@ class FormalPowerSeriesArb : public FormalPowerSeries<T>
 
     // ARITHMETIC OPERATORS
     constexpr FPSA  operator * ( const FPSA &a )  { return  FPSA(*this) *= a; }
+    constexpr FPSA  operator * ( const FPSB &a )  { return  FPSA( a.a ) *= (*this); }
 
     FPSA  &operator *= ( const FPSA &b )  {
         if( this->size() == 0  ||  b.size() == 0 )  {
@@ -932,6 +939,28 @@ class FormalPowerSeriesArb : public FormalPowerSeries<T>
         return  FPSA( { r.a.begin(), r.a.begin() + min( max( deg, size_t( 1 ) ), r.size() ) } );
     }
 
+    FPSA  pre( size_t sz ) const  {
+        FPSA  r( *this );
+        r.a.resize( min( this->size(), sz ) );
+        return  r;
+    }
+/* TODO FIX THIS TO USE FPSA MULT
+  FPSA  exp( int deg = -1 ) const  {
+      assert( (*this)[0] == 0 );
+      if( deg == -1 )   deg = this->size();
+      FPSB  res( { 1 } ),  g( { 1 } );
+
+      for( int m=1 ; m<deg ; m<<=1 )  {
+          g = ( g + g - g * g * res ).pre( m );
+          FPSB  a = pre( m ).differential();
+          FPSB  b = ( a + g*( res.differential() - res * a ) ).pre( 2*m - 1 );
+          res = ( res + res*( pre( 2*m ) - b.integral() ) ).pre( 2*m );
+      }
+      FPSA  ret( res.a );
+      ret.a.resize( deg );
+      return  ret;
+  }
+*/
   private:
     static void  init()  {
         static bool  initialized = false;
@@ -1011,15 +1040,7 @@ int  main()  {
     FPSA  x( n );
     cin >> x;
 
-    auto  ans = x.sqrt();
-
-    if( ans.size() )   cout << ans;
-    else               cout << "-1";
-    cout << '\n';
-
-    ans *= x;
-
-    cout << ans << endl;
+    cout << x.inverse() << '\n';
 
     return  0;
 }
